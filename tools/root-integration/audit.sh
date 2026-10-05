@@ -70,7 +70,9 @@ grep -q "obj-\$(CONFIG_NOMOUNT) += nomount/" fs/Makefile && ok "fs/Makefile wire
 grep -q "fs/nomount/Kconfig" fs/Kconfig && ok "fs/Kconfig wired" || fail "fs/Kconfig not wired"
 
 echo "== defconfig"
-DEFCONFIG=${DEFCONFIG:-arch/arm64/configs/vendor/xiaomi/miatoll_defconfig}
+# accept either the make target (vendor/xiaomi/miatoll_defconfig) or a plain path
+DEFCONFIG=${DEFCONFIG:-vendor/xiaomi/miatoll_defconfig}
+[ -f "$DEFCONFIG" ] || DEFCONFIG="arch/arm64/configs/${DEFCONFIG}"
 for opt in CONFIG_KSU=y CONFIG_KSU_SUSFS=y CONFIG_NOMOUNT=y CONFIG_KALLSYMS_ALL=y \
            CONFIG_KSU_TAMPER_SYSCALL_TABLE=y CONFIG_PID_NS=y CONFIG_IPC_NS=y CONFIG_USER_NS=y \
            CONFIG_SYSVIPC=y CONFIG_OVERLAY_FS=y; do

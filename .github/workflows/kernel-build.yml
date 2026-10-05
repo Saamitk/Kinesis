@@ -19,7 +19,6 @@ permissions:
 env:
   LLVM_VER: r596125
   ARCH: arm64
-  DEFCONFIG: vendor/xiaomi/miatoll_defconfig
 
 jobs:
   build:
@@ -65,10 +64,27 @@ jobs:
           "$DEST/bin/clang" --version | head -3
 
       - name: Audit root stack
-        run: bash tools/root-integration/audit.sh "$PWD"
+        run: |
+          set -o pipefail
+          bash tools/root-integration/audit.sh "$PWD" 2>&1 | tee audit.log
 
       - name: Build kernel and package AnyKernel3
-        run: ./build.sh
+        env:
+          DEFCONFIG: vendor/xiaomi/miatoll_defconfig
+        run: |
+          set -o pipefail
+          ./build.sh 2>&1 | tee build.log
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            audit.log
+            build.log
+          if-no-files-found: ignore
+          retention-days: 5
 
       - name: Checksums
         run: |
