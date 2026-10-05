@@ -90,6 +90,11 @@ done
 
 # --check-only: compile just the new components first, so CI iterations are fast
 if [ "${QUICK_CHECK:-0}" = "1" ]; then
+  echo "==> quick check: preparing generated headers"
+  make -j"$JOBS" O=out ARCH=$ARCH \
+    CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE="$CROSS_COMPILE" \
+    LD=ld.lld AR=llvm-ar NM=llvm-nm HOSTCC=clang HOSTCXX=clang++ \
+    KCFLAGS="$KCFLAGS" prepare init/version.o
   echo "==> quick check: compiling the root stack objects only"
   make -j"$JOBS" O=out ARCH=$ARCH \
     LLVM=1 LLVM_IAS=1 \
