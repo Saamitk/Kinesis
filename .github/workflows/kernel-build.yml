@@ -86,6 +86,32 @@ jobs:
           if-no-files-found: ignore
           retention-days: 5
 
+      # The runner cannot hand us raw step logs in this environment, so on
+      # failure mirror the tail of the logs into the branch (read-accessible
+      # through the contents API). "[skip ci]" keeps this from looping.
+      - name: Publish failure logs
+        if: failure()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p ci-logs
+          {
+            echo "# CI failure logs"
+            echo
+            for f in audit.log build.log; do
+              [ -s "$f" ] || continue
+              echo "## $f"
+              echo '```'
+              tail -c 400000 "$f"
+              echo '```'
+              echo
+            done
+          } > ci-logs/latest.md
+          git add -f ci-logs/latest.md
+          git commit -m "ci: failure logs [skip ci]" || true
+          git push origin HEAD:${{ github.ref_name }} || true
+
       - name: Checksums
         run: |
           set -e
