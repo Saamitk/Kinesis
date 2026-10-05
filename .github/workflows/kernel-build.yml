@@ -96,11 +96,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 5
 
-      # The runner cannot hand us raw step logs in this environment, so on
-      # failure mirror the tail of the logs into the branch (read-accessible
-      # through the contents API). "[skip ci]" keeps this from looping.
+      # Diagnostics for the development branch only: the runner cannot hand us
+      # raw step logs in this environment, so on failure mirror the tail of the
+      # logs into the branch (read-accessible through the contents API).
+      # Release branches (including any future "17") are never modified by CI;
+      # "[skip ci]" keeps this from looping.
       - name: Publish failure logs
-        if: failure()
+        if: failure() && startsWith(github.ref, 'refs/heads/') && github.ref_name != '17'
         run: |
           set -e
           git config user.name "github-actions[bot]"
