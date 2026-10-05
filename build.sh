@@ -130,7 +130,7 @@ if [ "$BUILD_ZIP" = "1" ]; then
   rm -rf "$TOP/AK3" && cp -a "$TOP/AnyKernel3" "$TOP/AK3"
   find "$TOP/AK3" -name .gitignore -delete
   cp "$KIMG" "AK3/$(basename "$KIMG")"
-  sed -i "s|^kernel.string=.*|kernel.string=Saamrox Kinesis (4.14.357) |" AK3/anykernel.sh
+  sed -i "s|^kernel.string=.*|kernel.string=Saamrox Kinesis $(make -s kernelversion) miatoll|" AK3/anykernel.sh
   sed -i "s|^kernel.compiler=.*|kernel.compiler=$(clang --version | head -1 | sed 's/ (.*//') + ld.lld|" AK3/anykernel.sh
   sed -i "s|^kernel.made=.*|kernel.made=$(whoami)@$(hostname)|" AK3/anykernel.sh
   sed -i "s|^kernel.version=.*|kernel.version=$(make -s kernelversion)|" AK3/anykernel.sh
