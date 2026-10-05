@@ -96,6 +96,12 @@ MAKEARGS=(-j"$JOBS" O=out ARCH=$ARCH
   HOSTCC=clang HOSTCXX=clang++ HOSTLD=ld.lld HOSTAR=llvm-ar
   KCFLAGS="$KCFLAGS")
 
+# The KernelSU object includes selinux headers that are generated while
+# building security/selinux (flask.h/av_permissions.h live in the obj tree), so
+# make sure they exist before anything else compiles.
+echo "==> pre-building generated SELinux headers"
+make "${MAKEARGS[@]}" security/selinux/avc.o
+
 # QUICK_CHECK=1: compile just the new components first, so CI iterations are fast
 if [ "${QUICK_CHECK:-0}" = "1" ]; then
   echo "==> quick check: preparing generated headers"
