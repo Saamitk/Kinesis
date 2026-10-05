@@ -226,3 +226,5 @@ source "drivers/sensors/Kconfig"
 source "drivers/esoc/Kconfig"
 
 endmenu
+
+source "drivers/kernelsu/Kconfig"

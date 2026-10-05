@@ -1,0 +1,125 @@
+name: Kernel Build
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'Saamrox*'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish a GitHub release with the built AnyKernel3 zip'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  LLVM_VER: r596125
+  ARCH: arm64
+  DEFCONFIG: vendor/xiaomi/miatoll_defconfig
+
+jobs:
+  build:
+    name: Build Saamrox (miatoll, clang ${{ inputs.llvm_ver || 'r596125' }})
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              bc bison flex libssl-dev libelf-dev zip unzip curl ca-certificates
+          sudo apt-get install -y --no-install-recommends libtinfo5 || true
+
+      - name: Fetch AOSP clang ${{ env.LLVM_VER }}
+        run: |
+          set -e
+          DEST="toolchains/clang-${LLVM_VER}"
+          mkdir -p "$DEST"
+          URL_AOSP="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-${LLVM_VER}.tar.gz"
+          URL_MIRROR="https://github.com/jaymvictorino/clang-${LLVM_VER}-mirror/releases/download/v0.0.1/linux-x86-refs-heads-mirror-goog-main-llvm-toolchain-source-clang-${LLVM_VER}.tar.gz"
+          for url in "$URL_AOSP" "$URL_MIRROR"; do
+            echo "==> trying $url"
+            if curl -fL --retry 3 --retry-delay 5 --connect-timeout 30 -o clang.tar.gz "$url"; then
+              echo "==> extracting"
+              tar -xzf clang.tar.gz -C "$DEST" && rm -f clang.tar.gz && break
+            fi
+            rm -f clang.tar.gz
+          done
+          test -x "$DEST/bin/clang" || { echo "!! could not fetch clang ${LLVM_VER}"; exit 1; }
+          ls "$DEST/bin" | head -20
+          "$DEST/bin/clang" --version | head -3
+
+      - name: Audit root stack
+        run: bash tools/root-integration/audit.sh "$PWD"
+
+      - name: Build kernel and package AnyKernel3
+        run: ./build.sh
+
+      - name: Checksums
+        run: |
+          set -e
+          ls -lh Saamrox-*.zip
+          sha256sum Saamrox-*.zip | tee Saamrox-*.zip.sha256sum
+
+      - name: Upload AnyKernel3 zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Saamrox-miatoll
+          path: |
+            Saamrox-*.zip
+            Saamrox-*.zip.sha256sum
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Release Saamrox
+    needs: build
+    if: |
+      startsWith(github.ref, 'refs/tags/Saamrox') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download AnyKernel3 zip
+        uses: actions/download-artifact@v4
+        with:
+          name: Saamrox-miatoll
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          DATE=$(date -u +%Y%m%d)
+          if [[ "${GITHUB_REF}" == refs/tags/Saamrox* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="Saamrox-${DATE}-${GITHUB_RUN_NUMBER}"
+          fi
+          ZIP=$(ls Saamrox-*.zip | head -1)
+          SHA=$(ls Saamrox-*.zip.sha256sum | head -1)
+          gh release create "$TAG" "$ZIP" "$SHA" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Saamrox ${TAG#Saamrox-}" \
+            --notes "Saamrox kernel for the Xiaomi sm6250 family (miatoll / Redmi Note 9 Pro series).
+
+          Built from ${GITHUB_REPOSITORY}@${GITHUB_SHA} with AOSP clang ${LLVM_VER} (LLVM_IAS=1, ld.lld).
+
+          **Stack:** KernelSU (backslashxx, v3.3.0+) - SuSFS v2.3.0 - NoMount v2.0.0 - DroidSpaces container support
+
+          Flash with a custom recovery (or a kernel flasher that supports AnyKernel3)."
