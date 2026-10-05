@@ -27,7 +27,7 @@ BUILD_ZIP=1
 
 # clang 22 is stricter than the clang these old vendor trees were written for;
 # keep the standard 4.14 error promotions from breaking the build.
-KCFLAGS=${KCFLAGS:--Wno-error=implicit-int -Wno-error=implicit-function-declaration -Wno-error=strict-prototypes -Wno-error=incompatible-pointer-types -Wno-error=designated-init -Wno-error=unknown-warning-option}
+KCFLAGS=${KCFLAGS:--Wno-error=unknown-warning-option -Wno-error=implicit-int -Wno-error=implicit-function-declaration -Wno-error=strict-prototypes -Wno-error=incompatible-pointer-types -Wno-error=designated-init -Wno-error=date-time}
 
 export KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST:-kinesis-saamrox}
 export KBUILD_BUILD_USER=${KBUILD_BUILD_USER:-saamrox}
