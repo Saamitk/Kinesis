@@ -68,6 +68,14 @@ jobs:
           set -o pipefail
           bash tools/root-integration/audit.sh "$PWD" 2>&1 | tee audit.log
 
+      - name: Quick check (root stack objects)
+        env:
+          DEFCONFIG: vendor/xiaomi/miatoll_defconfig
+          QUICK_CHECK: '1'
+        run: |
+          set -o pipefail
+          ./build.sh 2>&1 | tee check.log
+
       - name: Build kernel and package AnyKernel3
         env:
           DEFCONFIG: vendor/xiaomi/miatoll_defconfig
@@ -82,6 +90,7 @@ jobs:
           name: build-logs
           path: |
             audit.log
+            check.log
             build.log
           if-no-files-found: ignore
           retention-days: 5
@@ -99,7 +108,7 @@ jobs:
           {
             echo "# CI failure logs"
             echo
-            for f in audit.log build.log; do
+            for f in audit.log check.log build.log; do
               [ -s "$f" ] || continue
               echo "## $f"
               echo '```'
