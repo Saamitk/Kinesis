@@ -145,20 +145,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  release:
-    name: Release Saamrox
-    needs: build
-    if: |
-      startsWith(github.ref, 'refs/tags/Saamrox') ||
-      (github.event_name == 'workflow_dispatch' && inputs.release)
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Download AnyKernel3 zip
-        uses: actions/download-artifact@v4
-        with:
-          name: Saamrox-miatoll
-
       - name: Publish release
+        if: |
+          startsWith(github.ref, 'refs/tags/Saamrox') ||
+          (github.event_name == 'workflow_dispatch' && inputs.release)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -176,9 +166,9 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Saamrox ${TAG#Saamrox-}" \
             --notes "Saamrox kernel for the Xiaomi sm6250 family (miatoll / Redmi Note 9 Pro series).
-
+          
           Built from ${GITHUB_REPOSITORY}@${GITHUB_SHA} with AOSP clang ${LLVM_VER} (LLVM_IAS=1, ld.lld).
-
+          
           **Stack:** KernelSU (backslashxx, v3.3.0+) - SuSFS v2.3.0 - NoMount v2.0.0 - DroidSpaces container support
-
+          
           Flash with a custom recovery (or a kernel flasher that supports AnyKernel3)."
