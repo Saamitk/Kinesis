@@ -88,35 +88,27 @@ for c in CONFIG_KSU=y CONFIG_KSU_SUSFS=y CONFIG_NOMOUNT=y CONFIG_KALLSYMS_ALL=y;
   grep -qx "$c" out/.config || { echo "!! $c not enabled in out/.config" >&2; exit 1; }
 done
 
-# --check-only: compile just the new components first, so CI iterations are fast
+MAKEARGS=(-j"$JOBS" O=out ARCH=$ARCH
+  LLVM=1 LLVM_IAS=1
+  CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE="$CROSS_COMPILE"
+  LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump
+  READELF=llvm-readelf STRIP=llvm-strip SIZE=llvm-size
+  HOSTCC=clang HOSTCXX=clang++ HOSTLD=ld.lld HOSTAR=llvm-ar
+  KCFLAGS="$KCFLAGS")
+
+# QUICK_CHECK=1: compile just the new components first, so CI iterations are fast
 if [ "${QUICK_CHECK:-0}" = "1" ]; then
   echo "==> quick check: preparing generated headers"
-  make -j"$JOBS" O=out ARCH=$ARCH \
-    CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE="$CROSS_COMPILE" \
-    LD=ld.lld AR=llvm-ar NM=llvm-nm HOSTCC=clang HOSTCXX=clang++ \
-    KCFLAGS="$KCFLAGS" prepare init/version.o
+  make "${MAKEARGS[@]}" prepare
+  make "${MAKEARGS[@]}" init/version.o
   echo "==> quick check: compiling the root stack objects only"
-  make -j"$JOBS" O=out ARCH=$ARCH \
-    LLVM=1 LLVM_IAS=1 \
-    CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE="$CROSS_COMPILE" \
-    LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump \
-    READELF=llvm-readelf STRIP=llvm-strip SIZE=llvm-size \
-    HOSTCC=clang HOSTCXX=clang++ HOSTLD=ld.lld HOSTAR=llvm-ar \
-    KCFLAGS="$KCFLAGS" \
-    fs/susfs.o fs/nomount/nomount.o drivers/kernelsu/ksu.o
+  make "${MAKEARGS[@]}" fs/susfs.o fs/nomount/nomount.o drivers/kernelsu/ksu.o
   echo "==> quick check passed"
   exit 0
 fi
 
 echo "==> building Image.gz ($JOBS jobs, $(clang --version | head -1))"
-make -j"$JOBS" O=out ARCH=$ARCH \
-  LLVM=1 LLVM_IAS=1 \
-  CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE="$CROSS_COMPILE" \
-  LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump \
-  READELF=llvm-readelf STRIP=llvm-strip SIZE=llvm-size \
-  HOSTCC=clang HOSTCXX=clang++ HOSTLD=ld.lld HOSTAR=llvm-ar \
-  KCFLAGS="$KCFLAGS" \
-  Image.gz
+make "${MAKEARGS[@]}" Image.gz
 
 KIMG=out/arch/arm64/boot/Image.gz
 [ -s out/arch/arm64/boot/Image.gz-dtb ] && KIMG=out/arch/arm64/boot/Image.gz-dtb
