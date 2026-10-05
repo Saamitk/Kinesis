@@ -79,6 +79,7 @@ jobs:
       - name: Build kernel and package AnyKernel3
         env:
           DEFCONFIG: vendor/xiaomi/miatoll_defconfig
+          KEEP_GOING: '1'
         run: |
           set -o pipefail
           ./build.sh 2>&1 | tee build.log
@@ -108,11 +109,16 @@ jobs:
           {
             echo "# CI failure logs"
             echo
+            echo "## build error context"
+            echo '```'
+            grep -n -B3 -A12 -E "error:|Error 1|fatal error|No rule to make target|undefined reference|Permission denied|command not found" build.log 2>/dev/null | head -500 || true
+            echo '```'
+            echo
             for f in audit.log check.log build.log; do
               [ -s "$f" ] || continue
               echo "## $f"
               echo '```'
-              tail -c 400000 "$f"
+              tail -c 300000 "$f"
               echo '```'
               echo
             done

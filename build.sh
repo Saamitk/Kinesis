@@ -88,7 +88,10 @@ for c in CONFIG_KSU=y CONFIG_KSU_SUSFS=y CONFIG_NOMOUNT=y CONFIG_KALLSYMS_ALL=y;
   grep -qx "$c" out/.config || { echo "!! $c not enabled in out/.config" >&2; exit 1; }
 done
 
-MAKEARGS=(-j"$JOBS" O=out ARCH=$ARCH
+MAKE_KEEP_GOING=""
+[ "${KEEP_GOING:-0}" = "1" ] && MAKE_KEEP_GOING="-k"
+
+MAKEARGS=(-j"$JOBS" $MAKE_KEEP_GOING O=out ARCH=$ARCH
   LLVM=1 LLVM_IAS=1
   CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE="$CROSS_COMPILE"
   LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump
