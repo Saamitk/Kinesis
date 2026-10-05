@@ -141,7 +141,6 @@ make[1]: Entering directory '/home/runner/work/Kinesis/Kinesis/out'
   HOSTCC  scripts/kconfig/zconf.tab.o
   HOSTLD  scripts/kconfig/conf
 scripts/kconfig/conf  --silentoldconfig Kconfig
-arch/arm64/Makefile:65: Detected assembler with broken .inst; disassembly will be unreliable
   CHK     include/config/kernel.release
   UPD     include/config/kernel.release
   GEN     ./Makefile
@@ -199,40 +198,129 @@ arch/arm64/Makefile:65: Detected assembler with broken .inst; disassembly will b
   WRAP    arch/arm64/include/generated/asm/user.h
   WRAP    arch/arm64/include/generated/asm/vga.h
   WRAP    arch/arm64/include/generated/asm/xor.h
+  CHK     include/generated/timeconst.h
+  CC      kernel/bounds.s
+  UPD     include/generated/timeconst.h
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+  CHK     include/generated/bounds.h
+  UPD     include/generated/bounds.h
+  CC      arch/arm64/kernel/asm-offsets.s
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+  CHK     include/generated/asm-offsets.h
+  UPD     include/generated/asm-offsets.h
+  CALL    ../scripts/checksyscalls.sh
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+  LDS     arch/arm64/kernel/vdso/vdso.lds
+  VDSOA   arch/arm64/kernel/vdso/gettimeofday.o
+  VDSOA   arch/arm64/kernel/vdso/note.o
+  VDSOA   arch/arm64/kernel/vdso/sigreturn.o
+  LD      arch/arm64/kernel/vdso/vdso.so.dbg
+  VDSOSYM include/generated/vdso-offsets.h
+make[1]: Leaving directory '/home/runner/work/Kinesis/Kinesis/out'
+make[1]: Entering directory '/home/runner/work/Kinesis/Kinesis/out'
+  CHK     include/config/kernel.release
+  GEN     ./Makefile
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  Using .. as source for kernel
   LDS     scripts/module-lto.lds
-  HOSTCC  scripts/dtc/dtc.o
   HOSTCC  scripts/genksyms/genksyms.o
+  HOSTCC  scripts/dtc/dtc.o
   CC      scripts/mod/empty.o
 warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
 1 warning generated.
-/usr/bin/as: unrecognized option '-EL'
-clang-real: error: assembler command failed with exit code 1 (use -v to see invocation)
-make[3]: *** [../scripts/Makefile.build:365: scripts/mod/empty.o] Error 1
-make[2]: *** [../scripts/Makefile.build:667: scripts/mod] Error 2
-make[2]: *** Waiting for unfinished jobs....
-  HOSTCC  scripts/dtc/flattree.o
+  HOSTCC  scripts/mod/mk_elfconfig
   HOSTCC  scripts/selinux/genheaders/genheaders
-  HOSTCC  scripts/selinux/mdp/mdp
+  HOSTCC  scripts/dtc/flattree.o
+  CC      scripts/mod/devicetable-offsets.s
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
   SHIPPED scripts/genksyms/parse.tab.c
   SHIPPED scripts/genksyms/lex.lex.c
   SHIPPED scripts/genksyms/parse.tab.h
   HOSTCC  scripts/genksyms/parse.tab.o
+1 warning generated.
+  MKELF   scripts/mod/elfconfig.h
+  CHK     scripts/mod/devicetable-offsets.h
+  UPD     scripts/mod/devicetable-offsets.h
+  HOSTCC  scripts/mod/sumversion.o
+  HOSTCC  scripts/selinux/mdp/mdp
   HOSTCC  scripts/dtc/fstree.o
-  HOSTCC  scripts/dtc/data.o
   HOSTCC  scripts/genksyms/lex.lex.o
+  HOSTCC  scripts/dtc/data.o
+  HOSTCC  scripts/kallsyms
+  HOSTCC  scripts/mod/modpost.o
   HOSTCC  scripts/dtc/livetree.o
   HOSTCC  scripts/dtc/treesource.o
+  HOSTLD  scripts/genksyms/genksyms
+  HOSTCC  scripts/mod/file2alias.o
+  HOSTCC  scripts/pnmtologo
   HOSTCC  scripts/dtc/srcpos.o
+  HOSTCC  scripts/conmakehash
   HOSTCC  scripts/dtc/checks.o
   HOSTCC  scripts/dtc/util.o
   SHIPPED scripts/dtc/dtc-lexer.lex.c
   SHIPPED scripts/dtc/dtc-parser.tab.h
   SHIPPED scripts/dtc/dtc-parser.tab.c
   HOSTCC  scripts/dtc/dtc-lexer.lex.o
-  HOSTLD  scripts/genksyms/genksyms
+  HOSTLD  scripts/mod/modpost
   HOSTCC  scripts/dtc/dtc-parser.tab.o
+  HOSTCC  scripts/sortextable
+  HOSTCC  scripts/asn1_compiler
+  HOSTCC  scripts/extract-cert
   HOSTLD  scripts/dtc/dtc
-make[1]: *** [/home/runner/work/Kinesis/Kinesis/Makefile:614: scripts] Error 2
+  CHK     include/generated/timeconst.h
+  CHK     include/generated/bounds.h
+  CHK     include/generated/asm-offsets.h
+  CALL    ../scripts/checksyscalls.sh
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+  CHK     include/generated/compile.h
+  UPD     include/generated/compile.h
+  CC      init/version.o
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+make[1]: Leaving directory '/home/runner/work/Kinesis/Kinesis/out'
+==> quick check: compiling the root stack objects only
+make[1]: Entering directory '/home/runner/work/Kinesis/Kinesis/out'
+  CHK     include/config/kernel.release
+  GEN     ./Makefile
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  Using .. as source for kernel
+  CHK     scripts/mod/devicetable-offsets.h
+  CHK     include/generated/timeconst.h
+  CHK     include/generated/bounds.h
+  CHK     include/generated/asm-offsets.h
+  CALL    ../scripts/checksyscalls.sh
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+  CC      fs/nomount/nomount.o
+-- KDIR: 
+-- MDIR: /home/runner/work/Kinesis/Kinesis/KernelSU/kernel
+-- KernelSU Manager signature size: 0x033b
+-- KernelSU Manager signature hash: c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+-- KernelSU/compat: iterate_dir found!
+-- KernelSU/compat: f_op->read_iter found!
+  CC      fs/susfs.o
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+1 warning generated.
+1 warning generated.
+  CC      drivers/kernelsu/ksu.o
+warning: unknown warning option '-Werror=designated-init' [-Wunknown-warning-option]
+warning: unknown warning option '-Wno-discarded-qualifiers'; did you mean '-Wno-ignored-qualifiers'? [-Wunknown-warning-option]
+In file included from ../drivers/kernelsu/ksu.c:24:
+../security/selinux/include/avc_ss.h:10:10: fatal error: 'flask.h' file not found
+   10 | #include "flask.h"
+      |          ^~~~~~~~~
+2 warnings and 1 error generated.
+make[2]: *** [../scripts/Makefile.build:365: drivers/kernelsu/ksu.o] Error 1
+make[1]: *** [/home/runner/work/Kinesis/Kinesis/Makefile:1962: drivers/kernelsu/ksu.o] Error 2
 make[1]: Leaving directory '/home/runner/work/Kinesis/Kinesis/out'
 make: *** [Makefile:153: sub-make] Error 2
 ```
