@@ -757,6 +757,9 @@ CONFIG_KSU_SUSFS_SUS_MAP=y
 
 CONFIG_NOMOUNT=y
 
+# NoMount's userspace control channel is a key type ("nomount")
+CONFIG_KEYS=y
+
 # kallsyms (KernelSU on non-GKI; KALLSYMS_ALL needs DEBUG_KERNEL)
 CONFIG_DEBUG_KERNEL=y
 CONFIG_KALLSYMS=y
