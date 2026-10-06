@@ -69,6 +69,14 @@ echo "== NoMount"
 grep -q "obj-\$(CONFIG_NOMOUNT) += nomount/" fs/Makefile && ok "fs/Makefile wired" || fail "fs/Makefile not wired"
 grep -q "fs/nomount/Kconfig" fs/Kconfig && ok "fs/Kconfig wired" || fail "fs/Kconfig not wired"
 
+echo "== AnyKernel3 installer"
+if bash "$TOP/tools/root-integration/test-ak3.sh" "$TOP/AnyKernel3" >/dev/null 2>&1; then
+  ok "flashable zip installer resolves the boot partition"
+else
+  fail "AnyKernel3 installer check failed (run tools/root-integration/test-ak3.sh to see why)"
+  bash "$TOP/tools/root-integration/test-ak3.sh" "$TOP/AnyKernel3" 2>&1 | sed 's/^/        /'
+fi
+
 echo "== defconfig"
 # accept either the make target (vendor/xiaomi/miatoll_defconfig) or a plain path
 DEFCONFIG=${DEFCONFIG:-vendor/xiaomi/miatoll_defconfig}

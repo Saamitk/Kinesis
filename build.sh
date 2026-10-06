@@ -120,23 +120,45 @@ echo "==> building Image.gz ($JOBS jobs, $(clang --version | head -1))"
 make "${MAKEARGS[@]}" Image.gz
 
 KIMG=out/arch/arm64/boot/Image.gz
-[ -s out/arch/arm64/boot/Image.gz-dtb ] && KIMG=out/arch/arm64/boot/Image.gz-dtb
-echo "==> kernel image: $KIMG"
+if [ -s out/arch/arm64/boot/Image.gz-dtb ]; then
+  KIMG=out/arch/arm64/boot/Image.gz-dtb
+fi
+[ -s "$KIMG" ] || { echo "!! kernel image $KIMG was not produced" >&2; exit 1; }
+echo "==> kernel image: $KIMG ($(du -h "$KIMG" | cut -f1))"
 
 # ---- package AnyKernel3 -----------------------------------------------------
 if [ "$BUILD_ZIP" = "1" ]; then
   STAMP=$(date -u +"%Y%m%d-%H%M")
+  KVER=$(make -s kernelversion)
   ZIP="Saamrox-Kinesis-miatoll-${STAMP}.zip"
+
   rm -rf "$TOP/AK3" && cp -a "$TOP/AnyKernel3" "$TOP/AK3"
   find "$TOP/AK3" -name .gitignore -delete
   cp "$KIMG" "AK3/$(basename "$KIMG")"
-  sed -i "s|^kernel.string=.*|kernel.string=Saamrox Kinesis $(make -s kernelversion) miatoll|" AK3/anykernel.sh
-  sed -i "s|^kernel.compiler=.*|kernel.compiler=$(clang --version | head -1 | sed 's/ (.*//') + ld.lld|" AK3/anykernel.sh
-  sed -i "s|^kernel.made=.*|kernel.made=$(whoami)@$(hostname)|" AK3/anykernel.sh
-  sed -i "s|^kernel.version=.*|kernel.version=$(make -s kernelversion)|" AK3/anykernel.sh
+  sed -i "s|^kernel.string=.*|kernel.string=Saamrox Kinesis $KVER miatoll|" AK3/anykernel.sh
+  # AnyKernel3 prints this file at flash time (kernel.string is the only other
+  # property it reads for the banner)
+  {
+    echo "Saamrox Kinesis $KVER"
+    echo "$(clang --version | head -1 | sed 's/ (.*//') + ld.lld"
+    echo "$(date -u +%Y-%m-%d) $(whoami)@$(hostname)"
+  } > AK3/version
+
   ( cd "$TOP/AK3" && zip -qr9 "../$ZIP" * )
+
+  # verify what actually ships: the installer must be complete and able to
+  # resolve the boot partition (a missing BLOCK aborts on every recovery)
+  rm -rf "$TOP/AK3V" && mkdir -p "$TOP/AK3V"
+  ( cd "$TOP/AK3V" && unzip -q "$TOP/$ZIP" )
+  for f in anykernel.sh tools/ak3-core.sh tools/busybox tools/magiskboot \
+           META-INF/com/google/android/update-binary META-INF/com/google/android/updater-script; do
+    [ -f "$TOP/AK3V/$f" ] || { echo "!! $f missing from $ZIP" >&2; exit 1; }
+  done
+  ls "$TOP"/AK3V/Image* >/dev/null 2>&1 || { echo "!! kernel image missing from $ZIP" >&2; exit 1; }
+  bash "$TOP/tools/root-integration/test-ak3.sh" "$TOP/AK3V"
+  rm -rf "$TOP/AK3V" "$TOP/AK3"
+
   sha256sum "$ZIP" > "$ZIP.sha256sum"
-  rm -rf "$TOP/AK3"
   echo "==> flashable zip: $ZIP ($(du -h "$ZIP" | cut -f1))"
   echo "    sha256: $(cut -d' ' -f1 "$ZIP.sha256sum")"
 fi

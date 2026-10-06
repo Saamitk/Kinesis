@@ -6,10 +6,6 @@
 # begin properties
 properties() { '
 kernel.string=Saamrox Kinesis
-kernel.compiler=x
-kernel.made=x
-kernel.version=x
-message.word=KernelSU + SuSFS + NoMount + DroidSpaces
 do.devicecheck=1
 do.modules=0
 do.systemless=1
@@ -25,10 +21,15 @@ supported.patchlevels=
 '; } # end properties
 
 # shell variables
-block=/dev/block/bootdevice/by-name/boot;
-is_slot_device=0;
-ramdisk_compression=auto;
-patch_vbmeta_flag=auto;
+# NOTE: these are the variable names tools/ak3-core.sh actually reads. The old
+# lowercase spellings (block=, is_slot_device=, ...) are ignored by this
+# AnyKernel3 and make every recovery abort with "Unable to determine partition".
+# BLOCK takes a by-name partition name (auto-detected across the usual by-name
+# locations) or an explicit /dev path.
+BLOCK=boot;
+IS_SLOT_DEVICE=0;
+RAMDISK_COMPRESSION=auto;
+PATCH_VBMETA_FLAG=auto;
 
 
 ## AnyKernel methods (DO NOT CHANGE)
@@ -37,7 +38,7 @@ patch_vbmeta_flag=auto;
 
 
 ## AnyKernel file attributes
-# no ramdisk files are shipped (do.systemless=1)
+# no ramdisk files are shipped (do.modules=0)
 
 ## AnyKernel boot install
 dump_boot;
