@@ -136,6 +136,7 @@ Android.bp
 #
 /out/
 /AK3/
+/AK3V/
 /toolchains/
 /Saamrox-*.zip
 /Saamrox-*.zip.sha256sum
