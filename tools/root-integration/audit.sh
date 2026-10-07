@@ -69,6 +69,28 @@ echo "== NoMount"
 grep -q "obj-\$(CONFIG_NOMOUNT) += nomount/" fs/Makefile && ok "fs/Makefile wired" || fail "fs/Makefile not wired"
 grep -q "fs/nomount/Kconfig" fs/Kconfig && ok "fs/Kconfig wired" || fail "fs/Kconfig not wired"
 
+echo "== Haptics (aw8624 LRA driver)"
+for f in drivers/misc/aw8624_haptic/aw8624.c drivers/misc/aw8624_haptic/aw8624.h; do
+  [ -e "$f" ] && ok "$f present" || fail "$f missing"
+done
+grep -q "obj-\$(CONFIG_AW8624_HAPTIC) += aw8624_haptic/" drivers/misc/Makefile \
+  && ok "drivers/misc/Makefile wired" || fail "drivers/misc/Makefile not wired"
+grep -q "drivers/misc/aw8624_haptic/Kconfig" drivers/misc/Kconfig \
+  && ok "drivers/misc/Kconfig wired" || fail "drivers/misc/Kconfig not wired"
+# fixes carried by the imported driver revision
+grep -q "aw8624->effect_id = effect_id;" drivers/misc/aw8624_haptic/aw8624.c \
+  && ok "effect id is propagated (consistent vibration)" || fail "effect-id fix missing"
+grep -q "aw8624_haptic_set_level" drivers/misc/aw8624_haptic/aw8624.c \
+  && ok "ulevel gain scaling present" || fail "ulevel gain scaling missing"
+grep -q "dev_attr_ulevel" drivers/misc/aw8624_haptic/aw8624.c \
+  && ok "ulevel sysfs attribute registered" || fail "ulevel sysfs attribute missing"
+grep -q 'input_dev->name = "aw8624_haptic";' drivers/misc/aw8624_haptic/aw8624.c \
+  && ok "input device named aw8624_haptic" || fail "input device name unexpected"
+grep -q "if (!aw8624->enable_pin_control)" drivers/misc/aw8624_haptic/aw8624.c \
+  && ok "reset-gpio release guarded (probe/remove warning fix)" || fail "reset-gpio guard missing"
+grep -q 'awinic,aw8624_haptic' arch/arm64/boot/dts/qcom/cust-atoll-idp.dtsi \
+  && ok "device tree node present" || fail "aw8624 device tree node missing"
+
 echo "== AnyKernel3 installer"
 if bash "$TOP/tools/root-integration/test-ak3.sh" "$TOP/AnyKernel3" >/dev/null 2>&1; then
   ok "flashable zip installer resolves the boot partition"
@@ -82,6 +104,7 @@ echo "== defconfig"
 DEFCONFIG=${DEFCONFIG:-vendor/xiaomi/miatoll_defconfig}
 [ -f "$DEFCONFIG" ] || DEFCONFIG="arch/arm64/configs/${DEFCONFIG}"
 for opt in CONFIG_KSU=y CONFIG_KSU_SUSFS=y CONFIG_NOMOUNT=y CONFIG_KALLSYMS_ALL=y \
+           CONFIG_AW8624_HAPTIC=y \
            CONFIG_KSU_TAMPER_SYSCALL_TABLE=y CONFIG_PID_NS=y CONFIG_IPC_NS=y CONFIG_USER_NS=y \
            CONFIG_SYSVIPC=y CONFIG_OVERLAY_FS=y; do
   grep -qx "$opt" "$DEFCONFIG" && ok "$opt" || fail "$opt not enabled in $DEFCONFIG"

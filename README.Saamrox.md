@@ -16,6 +16,7 @@ shipped as a **flashable AnyKernel3 zip**, flashable from a custom recovery.
 | SuSFS | v2.3.0 (NON-GKI 4.14 port) | `fs/susfs.c`, `include/linux/susfs*.h` + hooks across `fs/`, `mm/`, `kernel/`, SELinux AVC |
 | NoMount | v2.0.0 built-in | `fs/nomount/`, key-type (`nomount`) control channel |
 | DroidSpaces | container support | namespaces, SysV IPC, POSIX mqueue, devtmpfs, cgroup controllers, bridge/veth/nftables NAT |
+| Haptics | Awinic AW8624 LRA driver v1.0.9 | `drivers/misc/aw8624_haptic/`, revision imported from `arshad-jamil33/android_kernel_xiaomi_sm6250@16.2` (effect-ID fix, `ulevel` gain control, logging cleanup) |
 
 ## Building
 
@@ -36,6 +37,22 @@ The CI equivalent is `.github/workflows/kernel-build.yml`:
 
 `tools/root-integration/audit.sh` statically verifies the KernelSU/SuSFS/NoMount
 integration (files, wiring, symbols, defconfig) before any CPU is spent.
+
+## Haptics
+
+The AW8624 LRA driver probes the node in `cust-atoll-idp.dtsi`
+(`awinic,aw8624_haptic` on `qupv3_se4_i2c`, address `0x5a`) and registers an
+input force-feedback device named `aw8624_haptic`. Tuning attributes live on the
+i2c client:
+
+```sh
+ls /sys/bus/i2c/devices/*-005a/          # activate, duration, gain, ulevel, seq, rtp, f0, ...
+cat /sys/bus/i2c/devices/*-005a/ulevel   # user level, 0-128, default 128
+echo 96 > /sys/bus/i2c/devices/*-005a/ulevel   # softer vibration
+```
+
+`ulevel` scales the gain (`ulevel * gain / 128`, capped at 255) and takes effect
+on the next vibration; it is the strength knob the driver revision added.
 
 ## Flashing
 
