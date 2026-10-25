@@ -20,8 +20,8 @@ static int sys_newfstat_handler_pre(struct kretprobe_instance *p, struct pt_regs
 
 	// grab ptr on entry
 	uintptr_t *arg = (uintptr_t *)p->data;
-	arg[0] = (uintptr_t)PT_REGS_SYSCALL_PARM1(real_regs); 
-	arg[1] = (uintptr_t)PT_REGS_PARM2(real_regs); 
+	arg[0] = (uintptr_t)PT_REGS_SYSCALL_PARM1(real_regs);
+	arg[1] = (uintptr_t)PT_REGS_PARM2(real_regs);
 
 	return 0;
 }
@@ -51,8 +51,8 @@ static int sys_fstat64_handler_pre(struct kretprobe_instance *p, struct pt_regs 
 
 	// grab ptr on entry
 	uintptr_t *arg = (uintptr_t *)p->data;
-	arg[0] = (uintptr_t)PT_REGS_SYSCALL_PARM1(real_regs); 
-	arg[1] = (uintptr_t)PT_REGS_PARM2(real_regs); 
+	arg[0] = (uintptr_t)PT_REGS_SYSCALL_PARM1(real_regs);
+	arg[1] = (uintptr_t)PT_REGS_PARM2(real_regs);
 
 	return 0;
 }

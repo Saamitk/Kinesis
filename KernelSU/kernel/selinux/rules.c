@@ -36,9 +36,7 @@ static struct policydb *get_policydb(void) { return &policydb; }
 // rwlock
 #if defined(KSU_COMPAT_USE_SELINUX_STATE)
 static inline rwlock_t *ksu_get_policy_rwlock() { return &selinux_state.ss->policy_rwlock; }
-#elif defined(KSU_COMPAT_HAS_EXPORTED_POLICY_RWLOCK)
-static inline rwlock_t *ksu_get_policy_rwlock() { extern rwlock_t policy_rwlock; return &policy_rwlock; }
-#elif defined(CONFIG_KALLSYMS)
+#elif defined(CONFIG_KALLSYMS_ALL)
 static noinline rwlock_t *ksu_get_policy_rwlock()
 {
 	static rwlock_t *lock = nullptr;
@@ -56,10 +54,14 @@ bootstrap:;
 lock_ok:
 	return lock;
 lock_null:
-	return nullptr;	
+	return nullptr;
 }
 #else
-static inline rwlock_t *ksu_get_policy_rwlock() { return nullptr; }
+static rwlock_t *ksu_get_policy_rwlock()
+{
+	extern rwlock_t policy_rwlock __weak;
+	return &policy_rwlock;
+}
 #endif
 
 #endif // < 5.10
@@ -93,7 +95,7 @@ static int apply_kernelsu_rules_fn(void *ptr)
 	// our ksud triggered by init
 	ksu_allow(db, "init", KERNEL_SU_DOMAIN, ALL, ALL);
 
-	// restored from https://github.com/tiann/KernelSU/pull/3031 
+	// restored from https://github.com/tiann/KernelSU/pull/3031
 	ksu_allow(db, "init", "adb_data_file", "file", ALL);
 	ksu_allow(db, "init", "adb_data_file", "dir", ALL); // #1289
 
@@ -210,12 +212,12 @@ out_flush:
 	smp_mb();
 	reset_avc_cache();
 #ifdef CONFIG_KSU_SUSFS
-	/* cache the sids susfs needs at runtime */
+	/* Cache the SIDs SUSFS uses in its hot-path checks. */
 	susfs_set_priv_app_sid();
 	susfs_set_init_sid();
 	susfs_set_ksu_sid();
 	susfs_set_zygote_sid();
-#endif // #ifdef CONFIG_KSU_SUSFS
+#endif
 #endif
 }
 

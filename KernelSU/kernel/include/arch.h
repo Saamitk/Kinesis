@@ -37,7 +37,7 @@
 #define __PT_PARM2_REG uregs[1]
 #define __PT_PARM3_REG uregs[2]
 #define __PT_PARM4_REG uregs[3]
-#define __PT_SYSCALL_PARM4_REG uregs[3] 
+#define __PT_SYSCALL_PARM4_REG uregs[3]
 #define __PT_CCALL_PARM4_REG uregs[3]
 #define __PT_PARM1_SYSCALL_REG __PT_PARM1_REG
 #define __PT_PARM2_SYSCALL_REG __PT_PARM2_REG

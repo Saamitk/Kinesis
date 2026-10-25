@@ -53,7 +53,7 @@ static struct ksu_sulog_pending_event *ksu_sulog_capture(__u16 event_type, const
 
 	if (!ksu_sulog_is_enabled())
 		return NULL;
-	
+
 	if (event_type == KSU_SULOG_EVENT_IOCTL_GRANT_ROOT || event_type == KSU_SULOG_EVENT_SUCOMPAT) {
 		filename_len = 0;
 		argv_len = 0;
@@ -89,7 +89,7 @@ alloc:
 	filename_buf = (char *)payload + sizeof(*event);
 
 	size_t actual_copy_len = bprm_argv_len;
-	
+
 	if (bprm_argv_len > remaining - 1)
 		actual_copy_len = remaining - 1 ;
 
@@ -106,7 +106,7 @@ alloc:
 skip_copy:
 	event->filename_len = filename_len;
 	event->argv_len = argv_len;
-	
+
 	payload_len = (__u32)sizeof(*event) + filename_len + argv_len;
 
 	// unlikely
@@ -245,7 +245,7 @@ flatten:
 	int len = strlen(buf);
 	if (!len)
 		goto flatten_done;
-	
+
 	*(buf + len) = ' ';
 	buf = buf + len + 1;
 

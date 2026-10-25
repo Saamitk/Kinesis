@@ -159,7 +159,7 @@ static int escape_to_root(bool is_forced)
 	if (profile->flags & FLAG_KSU_NO_NEW_PRIVS) {
 		set_thread_flag(TIF_KSU_DISABLE_ESCAPE_WITH_ROOT);
 	}
-	
+
 	setup_mount_ns(profile->namespaces);
 	ksu_put_root_profile(profile);
 	return 0;

@@ -133,7 +133,7 @@ static inline bool verify_selinux_cred_free(void *fn_ptr)
 static inline bool is_selinux_ops_valid(uintptr_t addr)
 {
 	extern char _stext[], _etext[];
-	int total_slots = sizeof(struct security_operations) / sizeof(void *); 
+	int total_slots = sizeof(struct security_operations) / sizeof(void *);
 	int valid_ptr = 0;
 	int i = 0;
 
@@ -159,7 +159,7 @@ density_verify_start:
 		valid_ptr++;
 
 next_iter:
-	i++;	
+	i++;
 	if (i < total_slots)
 		goto density_verify_start;
 
@@ -183,7 +183,7 @@ static inline bool check_candidate(uintptr_t addr)
 	// candidate found!
 	pr_info("%s: candidate selinux_ops at 0x%lx\n", __func__, (long)addr);
 
-	// check ptr density	
+	// check ptr density
 	if (!is_selinux_ops_valid(addr))
 		return false;
 
@@ -204,7 +204,7 @@ test_fn:
 	return verify_selinux_cred_free((void *)candidate->cred_free);
 }
 
-/** 
+/**
  * we do this in blocks of sequential 10k pointers.
  * 10k pointers up, 10k pointers down
  * this is predictable, more cache friendly, no trashing.
@@ -268,15 +268,15 @@ static inline void set_selinux_ops()
 	extern struct security_class_mapping secclass_map[];
 	extern struct list_head crypto_alg_list;
 	extern unsigned int avc_cache_threshold;
-	
+
 	struct security_operations *ops = nullptr;
 
-// if user exports selinux_ops, we just go for it!
-#ifdef KSU_HAS_EXPORTED_SELINUX_OPS
-	extern struct security_operations selinux_ops;
-	if (!ops)
+	// if user exports selinux_ops, we just go for it!
+	extern struct security_operations selinux_ops __weak;
+	if (!!&selinux_ops) {
+		pr_info("%s: exported selinux_ops: 0x%lx \n", __func__, (uintptr_t)&selinux_ops);
 		ops = (struct security_operations *)&selinux_ops;
-#endif
+	}
 
 #ifdef CONFIG_KEYS
 	extern struct key_user root_key_user;
@@ -299,31 +299,23 @@ static inline void set_selinux_ops()
 	if (!ops)
 		return;
 
-	selinux_ops_addr = (uintptr_t)ops;	
+	selinux_ops_addr = (uintptr_t)ops;
 }
 
 // stop_machine
 static int ksu_restore_file_permission_stop_machine(void *data)
 {
 	struct security_operations *ops = (struct security_operations *)selinux_ops_addr;
+	if (!orig_file_permission)
+		return 0;
 
-	if (orig_file_permission) {
-		pr_info("%s: restoring file_permission 0x%lx -> 0x%lx\n", __func__, (long)ops->file_permission, (long)orig_file_permission);
-		ops->file_permission = orig_file_permission;
-	}
-	
+	pr_info("%s: restoring file_permission 0x%lx -> 0x%lx\n", __func__, (long)ops->file_permission, (long)orig_file_permission);
+	ops->file_permission = orig_file_permission;
 	return 0;
 }
 
 static int ksu_restore_file_permission(void *data)
 {
-	struct security_operations *ops = (struct security_operations *)selinux_ops_addr;
-	if (!ops)
-		return 0;
-
-	if (!!strcmp((char *)ops, "selinux"))
-		return 0;
-
 loop_start:
 
 	msleep(1000);
@@ -331,7 +323,6 @@ loop_start:
 	if (*(volatile bool *)&ksu_vfs_read_hook)
 		goto loop_start;
 
-	// pr_info("%s: selinux_ops: 0x%lx .name = %s\n", __func__, (long)ops, (const char *)ops );
 	stop_machine(ksu_restore_file_permission_stop_machine, NULL, NULL);
 
 	return 0;
@@ -375,14 +366,14 @@ static void ksu_lsm_hook_init(void)
 	if (!ops)
 		return;
 
-	if (!!strcmp((char *)ops, "selinux"))
+	if (!!memcmp_inline(ops, "selinux", sizeof("selinux")))
 		return;
 
 	pr_info("%s: selinux_ops: 0x%lx .name = %s\n", __func__, (long)ops, (const char *)ops );
 
 	stop_machine(ksu_register_lsm_hook, NULL, NULL);
-	
-	kthread_run(ksu_restore_file_permission, NULL, "unhook");
+
+	kthread_run(ksu_restore_file_permission, NULL, "kthread");
 	return;
 }
 

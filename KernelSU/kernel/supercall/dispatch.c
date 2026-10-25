@@ -36,6 +36,9 @@ static int do_get_info(void __user *arg)
 	if (is_manager()) {
 		cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
 	}
+#ifndef KSU_NO_PREINIT
+	cmd.flags |= KSU_GET_INFO_FLAG_PREINIT;
+#endif
 	cmd.features = KSU_FEATURE_MAX;
 	cmd.uapi_version = KERNEL_SU_UAPI_VERSION;
 
@@ -101,7 +104,7 @@ static int do_report_event(void __user *arg)
 #ifdef CONFIG_KSU_SUSFS
 			susfs_is_boot_completed_triggered = true;
 			susfs_start_sdcard_monitor_fn();
-#endif // #ifdef CONFIG_KSU_SUSFS
+#endif // CONFIG_KSU_SUSFS
 		}
 		break;
 	}
@@ -266,7 +269,7 @@ static int do_uid_granted_root(void __user *arg)
 		return -EFAULT;
 	}
 
-	cmd.granted = ksu_is_allow_uid_for_current(cmd.uid);
+	cmd.granted = ksu_is_uid_granted_root(cmd.uid);
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
 		pr_err("uid_granted_root: copy_to_user failed\n");
@@ -355,7 +358,7 @@ static int do_set_app_profile(void __user *arg)
 static int do_get_feature(void __user *arg)
 {
 	struct ksu_get_feature_cmd cmd;
-	bool supported;
+	bool supported = false;
 	int ret;
 
 	if (copy_from_user(&cmd, arg, sizeof(cmd))) {
@@ -364,7 +367,13 @@ static int do_get_feature(void __user *arg)
 	}
 
 	ret = ksu_get_feature(cmd.feature_id, &cmd.value, &supported);
-	cmd.supported = supported ? 1 : 0;
+	cmd.supported = 0;
+	if (supported) {
+		cmd.supported |= KSU_FEATURE_FLAG_SUPPORTED;
+		if (ksu_feature_is_forced(cmd.feature_id)) {
+			cmd.supported |= KSU_FEATURE_FLAG_FORCED;
+		}
+	}
 
 	if (ret && supported) {
 		pr_err("get_feature: failed for feature %u: %d\n", cmd.feature_id, ret);
@@ -425,7 +434,7 @@ static int ksu_get_task_mark(pid_t pid)
 	task = find_task_by_vpid(pid);
 	if (!task) {
 		rcu_read_unlock();
-		return ret;	
+		return ret;
 	}
 
 	ret = !task->seccomp.mode;
@@ -446,20 +455,18 @@ static int do_manage_mark(void __user *arg)
 
 	switch (cmd.operation) {
 		case KSU_MARK_GET: {
-#ifndef CONFIG_KSU_SUSFS
-			// on this one, we return seccomp status of a pid instead
-			// at the very least we have partial featureset
-			ret = ksu_get_task_mark(cmd.pid);
-			if (ret < 0) {
-			    pr_err("manage_mark: get failed for pid %d: %d\n", cmd.pid, ret);
-			    return ret;
-			}
-			cmd.result = (u32)ret;
-#else
-			// susfs reports umount state instead of seccomp state here
+#ifdef CONFIG_KSU_SUSFS
 			cmd.result = susfs_is_current_proc_umounted() ? 0 : 1;
 			pr_info("manage_mark: ret for pid %d: %u\n", cmd.pid, cmd.result);
-#endif // #ifndef CONFIG_KSU_SUSFS
+#else
+			// Preserve KernelSU's mark/status result when SUSFS is disabled.
+			ret = ksu_get_task_mark(cmd.pid);
+			if (ret < 0) {
+				pr_err("manage_mark: get failed for pid %d: %d\n", cmd.pid, ret);
+				return ret;
+			}
+			cmd.result = (u32)ret;
+#endif
 			break;
 		}
 #if 0 // TODO: revisit this sometime
@@ -542,8 +549,8 @@ static int add_try_umount(void __user *arg)
 		case KSU_UMOUNT_ADD: {
 			long len = strncpy_from_user(buf, (const char __user *)cmd.arg, 256);
 			if (len <= 0)
-				return -EFAULT;	
-			
+				return -EFAULT;
+
 			buf[sizeof(buf) - 1] = '\0';
 
 			new_entry = kzalloc(sizeof(*new_entry), GFP_KERNEL);
@@ -590,7 +597,7 @@ static int add_try_umount(void __user *arg)
 			long len = strncpy_from_user(buf, (const char __user *)cmd.arg, sizeof(buf) - 1);
 			if (len <= 0)
 				return -EFAULT;
-			
+
 			buf[sizeof(buf) - 1] = '\0';
 
 			down_write(&mount_list_lock);
@@ -603,7 +610,7 @@ static int add_try_umount(void __user *arg)
 				}
 			}
 			up_write(&mount_list_lock);
-			
+
 			return 0;
 		}
 
@@ -612,7 +619,7 @@ static int add_try_umount(void __user *arg)
 			// check for pointer first
 			if (!cmd.arg)
 				return -EFAULT;
-		
+
 			size_t total_size = 0; // size of list in bytes
 
 			down_read(&mount_list_lock);
@@ -622,13 +629,13 @@ static int add_try_umount(void __user *arg)
 			up_read(&mount_list_lock);
 
 			pr_info("cmd_add_try_umount: total_size: %zu\n", total_size);
-			
+
 			if (copy_to_user((size_t __user *)cmd.arg, &total_size, sizeof(total_size)))
 				return -EFAULT;
 
 			return 0;
 		}
-		
+
 		// WARNING! this is straight up pointerwalking.
 		// this way we dont need to redefine the ioctl defs.
 		// this also avoids us needing to kmalloc
@@ -636,18 +643,18 @@ static int add_try_umount(void __user *arg)
 		case KSU_UMOUNT_GETLIST: {
 			if (!cmd.arg)
 				return -EFAULT;
-			
+
 			char *user_buf = (char *)cmd.arg;
 
 			down_read(&mount_list_lock);
 			list_for_each_entry(entry, &mount_list, list) {
 				pr_info("cmd_add_try_umount: entry: %s\n", entry->umountable);
-			
+
 				if (copy_to_user((char __user *)user_buf, entry->umountable, strlen(entry->umountable) + 1 )) {
 					up_read(&mount_list_lock);
 					return -EFAULT;
 				}
-				
+
 				// walk it! +1 for null terminator
 				user_buf = user_buf + strlen(entry->umountable) + 1;
 			}
@@ -662,7 +669,7 @@ static int add_try_umount(void __user *arg)
 		}
 
 	} // switch(cmd.mode)
-	
+
 	return 0;
 }
 
@@ -719,9 +726,88 @@ static int do_disable_escape_to_root(void __user *arg)
 	return 0;
 }
 
+/*
+ * Resolve symbols of the running kernel image, exported or not, matching
+ * them like ksuinit's /proc/kallsyms walk. Userspace uses this to bind a
+ * module's undefined symbols before init_module, so the kernel never parses
+ * the module ELF itself.
+ */
+static int do_lookup_symbols(void __user *arg)
+{
+	struct ksu_lookup_symbols_cmd cmd;
+	const u64 __user *unames;
+	u64 __user *uaddrs;
+	char **names;
+	unsigned long *addrs;
+	int ret = 0;
+	u32 i;
+
+	if (copy_from_user(&cmd, arg, sizeof(cmd)))
+		return -EFAULT;
+
+	if (cmd.flags) {
+		pr_err("lookup_symbols: unsupported flags 0x%x\n", cmd.flags);
+		return -EINVAL;
+	}
+	if (!cmd.count || cmd.count > KSU_LOOKUP_SYMBOLS_MAX)
+		return -EINVAL;
+
+	names = kvcalloc(cmd.count, sizeof(*names), GFP_KERNEL);
+	addrs = kvcalloc(cmd.count, sizeof(*addrs), GFP_KERNEL);
+	if (!names || !addrs) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	unames = (const u64 __user *)(uintptr_t)cmd.names;
+	uaddrs = (u64 __user *)(uintptr_t)cmd.addrs;
+	for (i = 0; i < cmd.count; i++) {
+		u64 uname;
+		char *name;
+
+		if (get_user(uname, unames + i)) {
+			ret = -EFAULT;
+			goto out;
+		}
+		name = strndup_user((const char __user *)(uintptr_t)uname, KSYM_NAME_LEN);
+		if (IS_ERR(name)) {
+			// An overlong name cannot be a kernel symbol: report it missing.
+			if (PTR_ERR(name) == -EINVAL)
+				continue;
+			ret = PTR_ERR(name);
+			goto out;
+		}
+		if (!*name) {
+			kfree(name);
+			continue;
+		}
+		names[i] = name;
+	}
+
+	ret = ksu_lookup_kernel_symbols((const char *const *)names, addrs, cmd.count);
+	if (ret < 0)
+		goto out;
+
+	for (i = 0; i < cmd.count; i++) {
+		if (put_user((u64)addrs[i], uaddrs + i)) {
+			ret = -EFAULT;
+			goto out;
+		}
+	}
+
+out:
+	if (names) {
+		for (i = 0; i < cmd.count; i++)
+			kfree(names[i]);
+	}
+	kvfree(names);
+	kvfree(addrs);
+	return ret;
+}
+
 // IOCTL handlers mapping table
 static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
-	{ .cmd = KSU_IOCTL_GRANT_ROOT, .name = "GRANT_ROOT", .handler = do_grant_root, .perm_check = allowed_for_su },
+	{ .cmd = KSU_IOCTL_GRANT_ROOT, .name = "GRANT_ROOT", .handler = do_grant_root, .perm_check = allowed_for_su  },
 	{ .cmd = KSU_IOCTL_GET_INFO, .name = "GET_INFO", .handler = do_get_info, .perm_check = always_allow },
 	{ .cmd = KSU_IOCTL_GET_INFO_LEGACY, .name = "GET_INFO_LEGACY", .handler = do_get_info_legacy, .perm_check = always_allow },
 	{ .cmd = KSU_IOCTL_REPORT_EVENT, .name = "REPORT_EVENT", .handler = do_report_event, .perm_check = only_root },
@@ -745,6 +831,7 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
 	{ .cmd = KSU_IOCTL_SET_INIT_PGRP, .name = "SET_INIT_PGRP", .handler = do_set_init_pgrp, .perm_check = only_root },
 	{ .cmd = KSU_IOCTL_GET_SULOG_FD, .name = "GET_SULOG_FD", .handler = do_get_sulog_fd, .perm_check = only_root },
 	{ .cmd = KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT, .name = "DISABLE_ESCAPE_TO_ROOT", .handler = do_disable_escape_to_root, .perm_check = only_root, .allow_su_session = true },
+	{ .cmd = KSU_IOCTL_LOOKUP_SYMBOLS, .name = "LOOKUP_SYMBOLS", .handler = do_lookup_symbols, .perm_check = only_root },
 	{ .cmd = 0, .name = NULL, .handler = NULL, .perm_check = NULL } // Sentinel
 };
 

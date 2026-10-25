@@ -59,7 +59,7 @@ static uintptr_t ksu_read_module_blacklist()
 
 	char *module_blacklist = *module_blacklist_pptr;
 	pr_info("module_blackist: 0x%lx with %s\n", (uintptr_t)module_blacklist, module_blacklist);
-	
+
 	return module_blacklist_pptr;
 }
 

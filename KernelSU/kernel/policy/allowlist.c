@@ -241,13 +241,21 @@ bool __ksu_is_allow_uid(uid_t uid)
 	return false;
 }
 
-bool __ksu_is_allow_uid_for_current(uid_t uid)
+bool ksu_is_uid_granted_root(uid_t uid)
 {
 	if (unlikely(uid == 0)) {
 		// already root, but only allow our domain.
 		return is_ksu_domain();
 	}
 	return __ksu_is_allow_uid(uid);
+}
+
+bool __ksu_is_allow_uid_for_current(uid_t uid)
+{
+	if (unlikely(uid == SHELL_UID) && !ksu_shell_su_allowed_for_current()) {
+		return false;
+	}
+	return ksu_is_uid_granted_root(uid);
 }
 
 bool ksu_uid_should_umount(uid_t uid)
@@ -398,8 +406,6 @@ out:
 	revert_creds(saved);
 }
 
-// this is a bit heavier than task work / workqueue but this allows
-// us to have our own context. we give it a full escaped-to-root one.
 static int persistent_allow_list_pre(void *data)
 {
 	/**

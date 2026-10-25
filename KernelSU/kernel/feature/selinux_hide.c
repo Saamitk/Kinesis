@@ -70,7 +70,7 @@ static __always_inline int ksu_hide_setprocattr_inline(const char *name, void *v
 
 	if (!ksu_should_destroy_context(buf))
 		return 0;
-	
+
 	pr_info("selinux_hide: setprocattr: destroy: %s\n", buf);
 	str[1] = '1';
 
@@ -151,7 +151,7 @@ static void ksu_init_hook_transaction_ops_write()
 		goto bail_out;
 
 	if (!d_inode(path.dentry))
-		goto bail_out;		
+		goto bail_out;
 
 	struct file_operations *fops = (struct file_operations *)d_inode(path.dentry)->i_fop;
 	if (!fops)
@@ -194,7 +194,7 @@ static int ksu_prepare_fake_status_page()
 	// not a leak when it is used forever :)
 	struct selinux_kernel_status *real_status = page_address(real_page);
 	struct selinux_kernel_status *fake_status = page_address(new_page);
-    
+
 	memcpy(fake_status, real_status, sizeof(*real_status));
 
 	fake_status->enforcing = 1;
@@ -207,9 +207,9 @@ static int ksu_prepare_fake_status_page()
 #endif
 
 	ksu_fake_status_page = new_page;
-    
+
 	pr_info("selinux_hide: ksu_fake_status_page ready! seq=%d\n", fake_status->sequence);
-            
+
 	return 0;
 }
 
@@ -248,14 +248,14 @@ static void ksu_init_hook_sel_handle_status_ops_open()
 		pr_info("selinux_hide: kern_path err: %d\n", error);
 		return;
 	}
-	
+
 	pr_info("selinux_hide: kern_path %s ok!\n", selinux_status);
 
 	if (!path.dentry)
 		goto bail_out;
 
 	if (!d_inode(path.dentry))
-		goto bail_out;	
+		goto bail_out;
 
 	struct file_operations *fops = (struct file_operations *)d_inode(path.dentry)->i_fop;
 	if (!fops)
@@ -307,7 +307,7 @@ init_hooks:; // apply_kernelsu_rules_fn
 try_again:
 	if (!ksu_prepare_fake_status_page())
 		goto page_ok;
-		
+
 	msleep(1000);
 	tries = tries + 1;
 	if (tries > 10)
@@ -320,7 +320,7 @@ page_ok:
 	ksu_init_hook_transaction_ops_write();
 
 	// selinux_setprocattr hook init is on lsm.
-	
+
 	// downstream/slow_avc_audit_defs.h
 	ksu_init_slow_avc_audit_hook();
 

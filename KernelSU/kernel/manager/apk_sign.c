@@ -136,7 +136,7 @@ static __always_inline bool check_v2_signature(char *path, unsigned expected_siz
 	if (kern_path(path, 0, &kpath))
 		return false;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
 	if (inode_is_locked(kpath.dentry->d_inode))
 #else
 	if (mutex_is_locked(&kpath.dentry->d_inode->i_mutex))
@@ -291,40 +291,27 @@ module_param_cb(ksu_debug_manager_appid, &expected_size_ops, &ksu_debug_manager_
 
 #endif
 
-int get_pkg_from_apk_path(char *pkg, const char *path)
+// /data/app/XXXXX/<PACKAGE_NAME>-YYY, which contains base.apk
+int get_pkg_from_apk_dir_path(char *pkg, const char *path)
 {
 	int len = strlen(path);
 	if (len >= KSU_MAX_PACKAGE_NAME || len < 1)
 		return -1;
 
-	const char *last_slash = NULL;
-	const char *second_last_slash = NULL;
-
-	int i;
-	for (i = len - 1; i >= 0; i--) {
-		if (path[i] == '/') {
-			if (!last_slash) {
-				last_slash = &path[i];
-			} else {
-				second_last_slash = &path[i];
-				break;
-			}
-		}
-	}
-
-	if (!last_slash || !second_last_slash)
+	const char *last_slash = strrchr(path, '/');
+	if (!last_slash)
 		return -1;
 
-	const char *last_hyphen = strchr(second_last_slash, '-');
-	if (!last_hyphen || last_hyphen > last_slash)
+	const char *last_hyphen = strchr(last_slash, '-');
+	if (!last_hyphen)
 		return -1;
 
-	int pkg_len = last_hyphen - second_last_slash - 1;
+	int pkg_len = last_hyphen - last_slash - 1;
 	if (pkg_len >= KSU_MAX_PACKAGE_NAME || pkg_len <= 0)
 		return -1;
 
 	// Copying the package name
-	memcpy(pkg, second_last_slash + 1, pkg_len);
+	memcpy(pkg, last_slash + 1, pkg_len);
 	pkg[pkg_len] = '\0';
 
 	return 0;
@@ -332,24 +319,8 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
 
 bool is_manager_apk(char *path)
 {
-#ifdef KSU_MANAGER_PACKAGE
-	char pkg[KSU_MAX_PACKAGE_NAME];
-	if (get_pkg_from_apk_path(pkg, path) < 0) {
-		pr_err("Failed to get package name from apk path: %s\n", path);
-		return false;
-	}
-
-	// pkg is `<real package>`
-	if (strncmp(pkg, KSU_MANAGER_PACKAGE, sizeof(KSU_MANAGER_PACKAGE))) {
-		return false;
-	}
-#endif
-
-	// dummy.keystore, however, lock it to me.weishu.kernelsu pkgname as per TheSillyOk/33a2a0ed4
-	char buf[KSU_MAX_PACKAGE_NAME];
-	constexpr char p[] = "me.weishu.kernelsu";
-	if (check_v2_signature(path, 0x363, "4359c171f32543394cbc23ef908c4bb94cad7c8087002ba164c8230948c21549") && 
-		!get_pkg_from_apk_path(buf, path) && !memcmp_inline(buf, p, sizeof(p)))
+	// dummy.keystore
+	if (check_v2_signature(path, 0x363, "4359c171f32543394cbc23ef908c4bb94cad7c8087002ba164c8230948c21549"))
 		return true;
 
 	// kernelsu official
@@ -358,6 +329,10 @@ bool is_manager_apk(char *path)
 
 	// KOWX712/KernelSU
 	if (check_v2_signature(path, 0x375, "484fcba6e6c43b1fb09700633bf2fb4758f13cb0b2f4457b80d075084b26c588"))
+		return true;
+
+	// midori01/KernelSU
+	if (check_v2_signature(path, 0x0368, "b9ee6759de4794f954883458b722b97ae6527cb7709a051db9a2348c0eea1e42"))
 		return true;
 
 	return false;

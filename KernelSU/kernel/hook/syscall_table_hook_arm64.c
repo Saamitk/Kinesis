@@ -42,7 +42,7 @@
 // it becomes syscall_fn_t sys_call_table[];
 
 extern long __arm64_sys_reboot(const struct pt_regs *regs);
-static syscall_fn_t aarch64_reboot __read_mostly = nullptr; 
+static syscall_fn_t aarch64_reboot __read_mostly = nullptr;
 asmlinkage long hook_aarch64_reboot(const struct pt_regs *regs)
 {
 	int magic1 = (int)regs->regs[0];
@@ -201,7 +201,7 @@ extern long __arm64_sys_read(const struct pt_regs *regs);
 static syscall_fn_t armeabi_read __read_mostly = nullptr;
 asmlinkage long hook_armeabi_read(const struct pt_regs *regs)
 {
-	unsigned int fd = (unsigned int)regs->regs[0];	
+	unsigned int fd = (unsigned int)regs->regs[0];
 
 	ksu_handle_sys_read_fd(fd);
 	return __arm64_sys_read(regs);
@@ -349,7 +349,7 @@ loop_start:
 	restore_syscall((void *)&armeabi_fstat64, __ARMEABI_fstat64, (void *)hook_armeabi_fstat64_ret, (void *)compat_sys_call_table);
 	restore_syscall((void *)&armeabi_read, __ARMEABI_read, (void *)hook_armeabi_read, (void *)compat_sys_call_table);
 #endif
-	
+
 	return 0;
 }
 

@@ -51,7 +51,7 @@ static __always_inline void ksu_slow_avc_audit_inline(u32 *tsid)
 struct selinux_state;
 __maybe_unused void ksu_slow_avc_audit(u32 *tsid) { return; } // dummy
 
-/* 
+/*
  * NOTE: both clang __overloadable and a C11 _Generic overloading
  * methods are included here only for demonstration purposes.
  *
@@ -94,8 +94,11 @@ static int __nocfi __overloadable ksu_slow_avc_audit_handler(u32 ssid, u32 tsid,
 }
 
 // now choose what we have
-static typeof(slow_avc_audit) *ksu_slow_avc_audit_hook __read_mostly = ksu_slow_avc_audit_handler;
-
+static typeof(slow_avc_audit) *ksu_slow_avc_audit_hook __read_mostly = nullptr;
+static inline void ksu_do_overload_slow_avc_audit(void)
+{
+	ksu_slow_avc_audit_hook = ksu_slow_avc_audit_handler;
+}
 #else /* !clang */
 
 static void *slow_avc_audit_fn __read_mostly = nullptr;
@@ -138,15 +141,18 @@ static int __nocfi ksu_slow_avc_audit_handler_4(u32 ssid, u32 tsid, u16 tclass, 
 )
 
 // now choose what we have
-static typeof(slow_avc_audit) *ksu_slow_avc_audit_hook __read_mostly = OVERLOAD_SLOW_AVC_AUDIT(slow_avc_audit);
-
+static typeof(slow_avc_audit) *ksu_slow_avc_audit_hook __read_mostly = nullptr;
+static inline void ksu_do_overload_slow_avc_audit(void)
+{
+	ksu_slow_avc_audit_hook = OVERLOAD_SLOW_AVC_AUDIT(slow_avc_audit);
+}
 #undef SLOW_AVC_AUDIT_TYPE_4
 #undef SLOW_AVC_AUDIT_TYPE_3
 #undef SLOW_AVC_AUDIT_TYPE_2
 #undef SLOW_AVC_AUDIT_TYPE_1
 #undef OVERLOAD_SLOW_AVC_AUDIT
 
-#endif /* !clang */ 
+#endif /* !clang */
 
 static void ksu_init_slow_avc_audit_hook(void)
 {
@@ -155,6 +161,8 @@ static void ksu_init_slow_avc_audit_hook(void)
 		pr_info("selinux_hide: sid grab fail?\n");
 		goto bail;
 	}
+
+	ksu_do_overload_slow_avc_audit();
 
 	*(uintptr_t *)&slow_avc_audit_fn = kallsyms_lookup_retry("slow_avc_audit");
 	if (!slow_avc_audit_fn)
@@ -203,7 +211,7 @@ static int slow_avc_audit_pre_handler(struct kprobe *p, struct pt_regs *regs)
 	return 0;
 }
 
-static void ksu_init_slow_avc_audit_hook(void) 
+static void ksu_init_slow_avc_audit_hook(void)
 {
 	int ret = ksu_selinux_get_sids();
 	if (ret)
@@ -219,7 +227,7 @@ void ksu_slow_avc_audit(u32 *tsid)
 	ksu_slow_avc_audit_inline(tsid);
 }
 
-static void ksu_init_slow_avc_audit_hook(void) 
+static void ksu_init_slow_avc_audit_hook(void)
 {
 	int ret = ksu_selinux_get_sids();
 	if (!ret)

@@ -210,7 +210,7 @@ static bool remove_avtab_node(struct policydb *db, struct avtab_node *node)
 			if (n->key.specified & AVTAB_XPERMS)
 				// specified and driver are u8, perms.p holds 8 u32s
 				shrink_size += sizeof(n->datum.u.xperms->specified) + sizeof(n->datum.u.xperms->driver) + sizeof(n->datum.u.xperms->perms.p);
-			else 
+			else
 				// data is u32
 				shrink_size += sizeof(n->datum.u.data);
 			n->next = NULL;
@@ -719,7 +719,7 @@ static void *ksu_kvrealloc_compat(const void *p, size_t oldsize, size_t newsize,
 	newp = kvmalloc(newsize, flags);
 	if (!newp)
 		return NULL;
-	__builtin_memcpy(newp, p, oldsize); // bypass fortify_source, kasan
+	memcpy(newp, p, oldsize);
 	kvfree(p);
 	return newp;
 }

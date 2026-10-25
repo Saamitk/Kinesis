@@ -83,6 +83,10 @@ envp_count_loop:
 
 	env_count = env_count + 1;
 
+	// thats just too much.
+	if (env_count > 64)
+		return -E2BIG;
+
 	goto envp_count_loop;
 
 envp_count_done:
@@ -97,13 +101,14 @@ envp_count_done:
 	if (IS_ERR_VALUE(mmap_page))
 		return -ENOMEM;
 
+	pr_info("%s: vm_mmap: 0x%lx page to userspace \n", __func__, mmap_page);
+
 	/**
 	 *  PLAN:
 	 * 	on 0, we put kLdPreload
 	 *	offset kLdLibraryPath at +64 bytes
 	 *	offset new envp at +128 bytes
 	 */
-
 	static_assert(sizeof(kLdPreload) < 64);
 	static_assert((sizeof(kLdPreload) + sizeof(kLdLibraryPath)) < 128);
 
@@ -153,8 +158,8 @@ envp_count_done:
 		return -EFAULT;
 
 	*(void ***)envp_arg = (void **)envp_array_p;
-	pr_info("new envp array blasted to userspace\n");
-	return 0;	
+	pr_info("%s: new envp array blasted to userspace\n", __func__);
+	return 0;
 }
 
 static noinline void do_ksu_adb_root_execve_user(void *restrict filename, void *restrict envp_in)
@@ -220,7 +225,7 @@ static noinline void do_ksu_adb_root_execve_kernel(void *restrict filename, void
 	pr_info("%s: envp 0x%lx \n", __func__, (uintptr_t)*envp_addr );
 
 	if (setup_ld_preload(envp_addr))
-		return; 
+		return;
 
 	pr_info("escape to root for adb\n");
 	escape_to_root_for_adb_root();

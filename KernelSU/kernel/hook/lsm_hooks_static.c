@@ -91,7 +91,7 @@ static void __init ksu_core_init(void)
 	uintptr_t target_callsite;
 	uintptr_t symbol_addr;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0) 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
 	target_callsite = kallsyms_lookup_retry("filename_renameat2");
 #else
 	target_callsite = kallsyms_lookup_retry("do_renameat2");

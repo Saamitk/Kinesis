@@ -1,7 +1,7 @@
 #!/bin/bash
 # Local build recipe for Kinesis (miatoll / Redmi Note 9 Pro family, sm6250, 4.14.357-openela)
 #
-# Root stack: KernelSU (backslashxx driver) + SUSFS v2.3.0 + NoMount v2.0.0,
+# Root stack: KernelSU (backslashxx upstream, KSU_VERSION 32704 / UAPI v6) + SUSFS v2.3.0 + NoMount v2.2.0,
 # container support for DroidSpaces -- all integrated in-tree.
 #
 # Toolchain: AOSP Clang 22.0.2 (r596125) by default, LLVM_IAS=1, ld.lld;

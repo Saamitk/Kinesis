@@ -21,11 +21,8 @@ static const char KERNEL_SU_RC[] =
 
 	"\n";
 
-static void stop_vfs_read_hook();
-static void stop_input_hook();
+static void stop_init_rc_hook();
 
-static bool ksu_module_mounted __read_mostly = false;
-static bool ksu_boot_completed __read_mostly = false;
 static bool ksu_vfs_read_hook __read_mostly = true;
 static bool ksu_input_hook __read_mostly = true;
 
@@ -38,63 +35,8 @@ static inline void ksu_disable_vfs_read_branch()
 	smp_mb();
 }
 #else
-static inline void ksu_disable_vfs_read_branch() { } // no-op
+#define ksu_disable_vfs_read_branch() do { } while (0)
 #endif
-
-void on_post_fs_data(void)
-{
-	static bool done = false;
-	if (done) {
-		pr_info("on_post_fs_data already done\n");
-		return;
-	}
-	done = true;
-	pr_info("on_post_fs_data!\n");
-
-	ksu_load_allow_list();
-	// sanity check, this may influence the performance
-	stop_input_hook();
-}
-
-extern void ext4_unregister_sysfs(struct super_block *sb);
-int nuke_ext4_sysfs(const char *mnt)
-{
-	struct path path;
-	int err = kern_path(mnt, 0, &path);
-	if (err) {
-		pr_err("nuke path err: %d\n", err);
-		return err;
-	}
-
-	struct super_block *sb = path.dentry->d_inode->i_sb;
-	const char *name = sb->s_type->name;
-	if (strcmp(name, "ext4") != 0) {
-		pr_info("nuke but module aren't mounted\n");
-		path_put(&path);
-		return -EINVAL;
-	}
-
-	ext4_unregister_sysfs(sb);
-	path_put(&path);
-	return 0;
-}
-
-void on_module_mounted(void)
-{
-	pr_info("on_module_mounted!\n");
-	ksu_module_mounted = true;
-}
-
-void on_boot_completed(void)
-{
-	ksu_boot_completed = true;
-	pr_info("on_boot_completed!\n");
-	track_throne(true);
-
-#ifdef CONFIG_KSU_HOSTSREDIRECT
-	ksu_hostsredirect_init();
-#endif
-}
 
 static ssize_t (*orig_read)(struct file *, char __user *, size_t, loff_t *);
 static ssize_t (*orig_read_iter)(struct kiocb *, struct iov_iter *);
@@ -102,7 +44,8 @@ static struct file_operations fops_proxy;
 static ssize_t ksu_rc_pos = 0;
 const size_t ksu_rc_len = sizeof(KERNEL_SU_RC) - 1;
 
-// Prefer /metadata/watchdog/ when present, else /metadata.
+// Prefer /metadata/vold, else /metadata/watchdog, else /metadata.
+#define MODULE_RC_PATH_VOLD "/metadata/vold/ksu/modules.rc"
 #define MODULE_RC_PATH_WATCHDOG "/metadata/watchdog/ksu/modules.rc"
 #define MODULE_RC_PATH_DEFAULT "/metadata/ksu/modules.rc"
 #define MODULE_RC_MAX (1u << 20) /* 1 MiB cap */
@@ -112,7 +55,12 @@ static ssize_t module_rc_pos;
 
 static struct file *open_module_rc(const char **chosen_path)
 {
-	struct file *f = filp_open(MODULE_RC_PATH_WATCHDOG, O_RDONLY, 0);
+	struct file *f = filp_open(MODULE_RC_PATH_VOLD, O_RDONLY, 0);
+	if (!IS_ERR(f)) {
+		*chosen_path = MODULE_RC_PATH_VOLD;
+		return f;
+	}
+	f = filp_open(MODULE_RC_PATH_WATCHDOG, O_RDONLY, 0);
 	if (!IS_ERR(f)) {
 		*chosen_path = MODULE_RC_PATH_WATCHDOG;
 		return f;
@@ -139,7 +87,7 @@ static void load_module_rc_once(void)
 	if (loaded)
 		return;
 	loaded = true;
- 
+
 	old_cred = override_creds(ksu_cred);
 
 	f = open_module_rc(&path);
@@ -166,7 +114,7 @@ static void load_module_rc_once(void)
 	}
 
 	r = kernel_read(f, module_rc_buf, fsize, &pos);
- 
+
 	if (r <= 0) {
 		pr_err("module rc: read failed: %zd\n", r);
 		kvfree(module_rc_buf);
@@ -201,11 +149,13 @@ static noinline void set_module_rc_len_vfs()
 
 	struct path path;
 
-	int err = kern_path(MODULE_RC_PATH_WATCHDOG, LOOKUP_FOLLOW, &path);
+	int err = kern_path(MODULE_RC_PATH_VOLD, LOOKUP_FOLLOW, &path);
+	if (err)
+		err = kern_path(MODULE_RC_PATH_WATCHDOG, LOOKUP_FOLLOW, &path);
 	if (err)
 		err = kern_path(MODULE_RC_PATH_DEFAULT, LOOKUP_FOLLOW, &path);
 	if (err)
-		return; 
+		return;
 
 	struct inode *inode = d_inode(path.dentry);
 	if (inode && S_ISREG(inode->i_mode))
@@ -348,12 +298,8 @@ static bool is_init_rc(struct file *fp)
 		return false;
 	}
 
-	const char *short_name = fp->f_path.dentry->d_name.name;
-	if (strcmp(short_name, "init.rc")) {
-		// we are only interest `init.rc` file name file
-		return false;
-	}
-	char path[256] = {0};
+	// Bind mounts retain the source dentry name, so match the mounted path.
+	char path[256];
 	char *dpath = d_path(&fp->f_path, path, sizeof(path));
 
 	if (IS_ERR(dpath)) {
@@ -378,11 +324,11 @@ static noinline void ksu_install_rc_hook(struct file *file)
 	// we only process the first read
 	static bool rc_hooked = false;
 	if (rc_hooked) {
-		// we don't need this kprobe, unregister it!
-		stop_vfs_read_hook();
+		// we don't need these hooks, unregister it!
 		return;
 	}
 	rc_hooked = true;
+	stop_init_rc_hook();
 
 	// since we already have domains, selinux is initialized, we can apply rules and shit
 	// https://github.com/LineageOS/android_system_core_old/blob/ecbcdafc3/init/init.cpp#L669
@@ -391,6 +337,7 @@ static noinline void ksu_install_rc_hook(struct file *file)
 	cache_sid();
 	setup_ksu_cred();
 	ksu_grab_init_session_keyring();
+	ksu_feature_apply_forced();
 
 	// now we can sure that the init process is reading
 	// `/system/etc/init/init.rc`
@@ -435,8 +382,7 @@ static noinline void ksu_handle_sys_read_fd(unsigned int fd)
 
 #define STAT_NATIVE 0
 #define STAT_STAT64 1
-
-static inline void ksu_common_newfstat_ret(unsigned int fd_int, void **statbuf_ptr, 
+static inline void ksu_common_newfstat_ret(unsigned int fd_int, void **statbuf_ptr,
 			const int type, const char *syscall_name)
 {
 	struct file *file = fget(fd_int);
@@ -470,16 +416,16 @@ static inline void ksu_common_newfstat_ret(unsigned int fd_int, void **statbuf_p
 		got_flipped = true;
 	}
 
-// NOTE: Workaround to OABI's (likely) write-alignment issue.
-// weirdly enough dedicated copying with offsetof causes an issue! (somehow byte 44 is misaligned?!)
-// here we copy the whole struct, edit and write it over back!
+/**
+ * NOTE: Workaround to OABI's (likely) write-alignment issue.
+ * weirdly enough dedicated copying with offsetof causes an issue! (somehow byte 44 is misaligned?!)
+ * here we copy the whole struct, edit and write it over back!
+ */
 #if defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_COMPAT_STAT64)
-
 	if (type == STAT_NATIVE)
 		goto stat_native;
-	
-	struct stat64 k_stat64 = { 0 };
 
+	struct stat64 k_stat64;
 	if (copy_from_user_retry(&k_stat64, statbuf, sizeof(struct stat64))) {
 		pr_info("%s: read statbuf 0x%lx failed \n", syscall_name, (uintptr_t)statbuf);
 		goto out;
@@ -501,9 +447,7 @@ static inline void ksu_common_newfstat_ret(unsigned int fd_int, void **statbuf_p
 
 stat_native:;
 #endif
-
-	struct stat k_stat = { 0 };
-
+	struct stat k_stat;
 	if (copy_from_user_retry(&k_stat, statbuf, sizeof(struct stat))) {
 		pr_info("%s: read statbuf 0x%lx failed \n", syscall_name, (uintptr_t)statbuf);
 		goto out;
@@ -553,7 +497,6 @@ void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_pt
 
 static bool safe_mode_flag = false;
 #define VOLUME_PRESS_THRESHOLD_COUNT 3
-
 bool ksu_is_safe_mode()
 {
 	// don't need to check again, userspace may call multiple times
@@ -562,11 +505,11 @@ bool ksu_is_safe_mode()
 		return true;
 
 	// stop hook first!
-	stop_input_hook();
+	ksu_stop_input_hook_runtime();
 
 	if (!safe_mode_flag)
 		return false;
-		
+
 	pr_info("volume keys pressed max times, safe mode detected!\n");
 	already_checked = true;
 	return true;
@@ -579,10 +522,10 @@ static void vol_detector_event(struct input_handle *handle, unsigned int type, u
 
 	if (!value)
 		return;
-	
+
 	if (type != EV_KEY)
 		return;
-	
+
 	if (code == KEY_VOLUMEDOWN) {
 		vol_down_cnt++;
 		pr_info("KEY_VOLUMEDOWN press detected!\n");
@@ -639,7 +582,7 @@ err_free_handle:
 	return error;
 }
 
-static const struct input_device_id vol_detector_ids[] = { 
+static const struct input_device_id vol_detector_ids[] = {
 	// we add key volume up so that
 	// 1. if you have broken volume down you get shit
 	// 2. we can make sure to trigger only ksu safemode, not android's safemode.
@@ -714,7 +657,7 @@ start:
 	pr_info("%s: ksud probably absent, closing hooks!\n", __func__);
 
 	// close down input hook
-	stop_input_hook();
+	ksu_stop_input_hook_runtime();
 
 	ksu_boot_completed = true;
 
@@ -723,21 +666,22 @@ bail:
 	return 0;
 }
 
-static void stop_vfs_read_hook()
+static void stop_init_rc_hook()
 {
 	ksu_vfs_read_hook = false;
 	pr_info("stop vfs_read_hook\n");
 	ksu_disable_vfs_read_branch();
+	ksu_disable_preinit_branch(nullptr);
 
 	kthread_run(ksu_hook_watchdog, NULL, "watchdog");
 }
 
-static void stop_input_hook()
+static void ksu_stop_input_hook_runtime()
 {
 	if (!ksu_input_hook) { return; }
 	ksu_input_hook = false;
 	pr_info("stop input_hook\n");
-	
+
 	vol_detector_exit();
 }
 

@@ -16,6 +16,10 @@ for f in drivers/kernelsu/Kconfig drivers/kernelsu/Makefile drivers/kernelsu/ksu
 done
 grep -q "obj-\$(CONFIG_KSU) += kernelsu/" drivers/Makefile && ok "drivers/Makefile wired" || fail "drivers/Makefile not wired"
 grep -q "drivers/kernelsu/Kconfig" drivers/Kconfig && ok "drivers/Kconfig wired" || fail "drivers/Kconfig not wired"
+grep -q '^#define KERNEL_SU_UAPI_VERSION 6$' KernelSU/kernel/include/uapi/supercall.h && ok "KernelSU UAPI v6" || fail "KernelSU UAPI is not v6"
+grep -q 'KSU_IOCTL_LOOKUP_SYMBOLS' KernelSU/kernel/supercall/dispatch.c && ok "UAPI v6 symbol lookup wired" || fail "UAPI v6 symbol lookup missing"
+grep -q 'KSU_GET_INFO_FLAG_PREINIT' KernelSU/kernel/supercall/dispatch.c && ok "UAPI v6 preinit capability wired" || fail "UAPI v6 preinit capability missing"
+grep -q 'NOMOUNT_BASE_VERSION "22"' fs/nomount/nomount.h && ok "NoMount v2.2.0" || fail "NoMount is not v2.2.0"
 
 echo "== SUSFS core"
 for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do

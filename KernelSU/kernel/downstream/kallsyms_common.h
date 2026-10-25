@@ -46,7 +46,7 @@ static inline void *old_kvrealloc(const void *p, size_t oldsize, size_t newsize,
 	newp = kvmalloc(newsize, flags);
 	if (!newp)
 		return nullptr;
-	__builtin_memcpy(newp, p, oldsize);
+	memcpy(newp, p, oldsize);
 	kvfree(p);
 	return newp;
 }
@@ -179,11 +179,15 @@ scan_start:
 	// cut it with these to make sure its a match
 	// .llvm.505034 or .lto_priv.0
 	char *dot_ptr = strchr(symbol_buf, '.');
-	if (!dot_ptr)
-		goto step_up;
+	if (dot_ptr)
+		dot_ptr[0] = '\0';
 
-	// terminate on first dot
-	dot_ptr[0] = '\0';
+	char *dollar_ptr = strchr(symbol_buf, '$');
+	if (dollar_ptr)
+		dollar_ptr[0] = '\0';
+
+	if (!dot_ptr && !dollar_ptr)
+		goto step_up;
 
 	insert_to_kallsyms_array(symbol_buf, curr);
 
@@ -270,9 +274,13 @@ static int kallsyms_on_each_symbol_cb(void *data, const char *name, struct modul
 	if (dot_ptr)
 		dot_ptr[0] = '\0';
 
+	char *dollar_ptr = strchr(namebuf, '$');
+	if (dollar_ptr)
+		dollar_ptr[0] = '\0';
+
 	if (!!strcmp(namebuf, args->target_name))
 		return 0;
-	
+
 	// return match
 	args->target_addr = addr;
 	return 1;
@@ -360,13 +368,48 @@ static noinline uintptr_t kallsyms_lookup_retry(const char *name)
 	}
 
 	return kallsyms_lookup_hashed_name(name);
-	
+
 found:;
 	char namebuf[KSYM_NAME_LEN];
 	sprint_symbol_no_offset(namebuf, addr);
 	pr_info("%s: %s addr: 0x%lx \n", __func__, namebuf, addr);
 	return addr;
 }
+
+// NOTE: absolute minimum compat, just to appease API.
+static int kallsyms_lookup_batched(const char *const *names, unsigned long *addrs, u32 count)
+{
+	int resolved = 0;
+	u32 i = 0;
+
+	if (!names || !addrs)
+		return -EINVAL;
+
+loop_start:
+	if (!names[i])
+		goto next;
+
+	addrs[i] = (unsigned long)kallsyms_lookup_retry(names[i]);
+	if (!addrs[i])
+		goto next;
+
+	if (!is_module_address(addrs[i])) {
+		addrs[i] = 0; // null module address
+		goto next;
+	}
+
+	resolved++;
+next:
+	i++;
+	if (i < count)
+		goto loop_start;
+
+	return resolved;
+}
+
+// compat to official ksu
+#define find_kernel_symbol_exact 	kallsyms_lookup_retry
+#define ksu_lookup_kernel_symbols	kallsyms_lookup_batched
 
 // ksu_get_ksym_size, return symbol size, return retfail if fail.
 static noinline size_t ksu_get_ksym_size(uintptr_t symbol_addr, size_t retfail)
@@ -391,7 +434,7 @@ static noinline size_t ksu_get_ksym_size(uintptr_t symbol_addr, size_t retfail)
  * this macro based refcounting timebomb is just me being responsible
  * letting this leak is not actually a big deal, maybe 512kb at most
  *
- * "if something was created and no one was around to free it, 
+ * "if something was created and no one was around to free it,
  *  is it a memory leak? or just permanent cache?"
  *  -- some retard "developer" using garbage collection
  *
@@ -433,8 +476,8 @@ static noinline void dotted_kallsyms_destroy_hash_array(void)
 	kallsyms_hash_array_entry_count = 0;
 	kallsyms_hash_array_capacity = 0;
 
-	const char *hw = "Hello, world!";
-	pr_info("chibihash64: '%s' #: 0x%llx \n", hw, chibihash64_wrapper(hw));
+	constexpr char hw[] = "Hello, world!";
+	pr_info("chibihash64: '%s' #: 0x%llx \n", hw, chibihash64(hw, sizeof(hw) - 1, 0ULL));
 
 }
 

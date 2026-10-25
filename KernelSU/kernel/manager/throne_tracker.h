@@ -13,13 +13,13 @@ void track_throne(bool prune_only);
  * false - file does NOT exist
  *
  */
-static inline bool is_file_existing(const char *path) 
+static inline bool is_file_existing(const char *path)
 {
 	struct path kpath;
 
 	if (!!kern_path(path, 0, &kpath))
 		return false;
-	
+
 	path_put(&kpath);
 	return true;
 }
@@ -31,7 +31,7 @@ static inline bool is_file_existing(const char *path)
  * false - file is deleted / being deleted/renamed
  *
  */
-static bool is_file_stable(const char *path) 
+static bool is_file_stable(const char *path)
 {
 	struct path kpath;
 

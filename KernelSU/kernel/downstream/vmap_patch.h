@@ -16,15 +16,6 @@
 
 // vmap_patch.h safely write to read-only fn_ptr slots or syscall table.
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0) 
-static noinline void ksu_do_nothing(void *unused) { };
-__weak void kick_all_cpus_sync(void)
-{
-	smp_mb();
-	smp_call_function(ksu_do_nothing, NULL, 1);
-}
-#endif
-
 /**
  * normally we want this on stop_machine, but we don't need HARD synchronization
  * we just let !cpuX use what they have in cache while we patch what is on cpuX.
@@ -35,9 +26,9 @@ __weak void kick_all_cpus_sync(void)
  */
 static inline void patch_ptr_slot_kick_cpu(void **target_slot, void *new_ptr)
 {
-	// __atomic_store_n((uintptr_t *)target_slot, (uintptr_t)new_ptr, __ATOMIC_RELAXED);
+// __atomic_store_n((uintptr_t *)target_slot, (uintptr_t)new_ptr, __ATOMIC_RELAXED);
+	assume_dereferenceable((void *)target_slot, sizeof(uintptr_t));
 	WRITE_ONCE(*target_slot, new_ptr);
-
 	kick_all_cpus_sync();
 }
 
@@ -123,7 +114,7 @@ static noinline void read_and_replace_syscall(void *old_ptr, unsigned long sysca
 	patch_ptr_slot_kick_cpu(target_slot, (void *)new_ptr);
 
 	vunmap(writable_addr);
-	smp_mb(); 
+	smp_mb();
 }
 
 static noinline void restore_syscall(void *old_ptr, unsigned long syscall_nr, void *new_ptr, void *target_table)
@@ -141,8 +132,8 @@ static noinline void restore_syscall(void *old_ptr, unsigned long syscall_nr, vo
 	 * it just copies wordsize of whatever is in *old_ptr, it should fill up a wordzie atleast
 	 * yeah it really just dummy copies machine instructions at this point.
 	 *
-	 * normally we use probe_kernel_address / get_kernel_nofault here but the API is 
-	 * so inconsistent across kernel versions, and since its just a dummied wrapper 
+	 * normally we use probe_kernel_address / get_kernel_nofault here but the API is
+	 * so inconsistent across kernel versions, and since its just a dummied wrapper
 	 * for copy_from_kernel_nofault we can do it ourselves
 	 *
 	 */
@@ -173,7 +164,7 @@ static noinline void restore_syscall(void *old_ptr, unsigned long syscall_nr, vo
 		pr_info("%s: syscall is not ours!\n", __func__);
 		goto out;
 	}
-	
+
 	pr_info("%s: syscall is ours! *target_slot: 0x%lx new_ptr: 0x%lx\n", __func__, (long)*target_slot, (long)new_ptr);
 
 	patch_ptr_slot_kick_cpu(target_slot, *(void **)old_ptr);
@@ -182,7 +173,20 @@ static noinline void restore_syscall(void *old_ptr, unsigned long syscall_nr, vo
 	WRITE_ONCE(*(void **)old_ptr, NULL);
 out:
 	vunmap(writable_addr);
-	smp_mb(); 
+	smp_mb();
 }
+
+// just so we can print out syscall_nr
+#define do_read_and_replace_syscall read_and_replace_syscall
+#define read_and_replace_syscall(old_p, syscall_nr, new_p, table) ({		\
+	pr_info("read_and_replace_syscall: hooking %s\n", #syscall_nr);		\
+	do_read_and_replace_syscall(old_p, syscall_nr, new_p, table);		\
+})
+
+#define do_restore_syscall restore_syscall
+#define restore_syscall(old_p, syscall_nr, new_p, table) ({			\
+	pr_info("restore_syscall: unhooking %s\n", #syscall_nr);		\
+	do_restore_syscall(old_p, syscall_nr, new_p, table);			\
+})
 
 #endif // __KSU_H_VMAP_PATCH

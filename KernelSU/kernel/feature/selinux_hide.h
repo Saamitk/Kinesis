@@ -78,7 +78,7 @@ static inline void ksu_selinux_hide_put_buf(struct ksu_hide_buf **unused)
 {
 	struct ksu_hide_buf **slot = this_cpu_ptr(ksu_selinux_hide_hazptr_slot);
 	__atomic_store_n(slot, NULL, __ATOMIC_RELEASE);
-	
+
 	preempt_enable();
 }
 
@@ -109,7 +109,7 @@ static noinline void ksu_add_shit_to_list(u32 cmd, const char *args[])
 	int argc = sepol_expected_argc(cmd);
 
 	if (cmd == KSU_SEPOLICY_CMD_TYPE || cmd == KSU_SEPOLICY_CMD_TYPE_ATTR || cmd == KSU_SEPOLICY_CMD_TYPE_STATE || cmd == KSU_SEPOLICY_CMD_ATTR) {
-		
+
 		const char *name = args[0];
 		size_t needed_len = strlen(name) + 3; // :type:\0
 
@@ -239,7 +239,7 @@ check_rule:; // double strstr
 	struct ksu_hide_buf *rule_buf __cleanup(ksu_selinux_hide_put_buf) = ksu_selinux_hide_get_buf(&ksu_hide_rule_list);
 	if (unlikely(!rule_buf))
 		return false;
-	
+
 	size_t offset = 0;
 	while (rule_buf->len > offset) {
 		const char *src_rule = rule_buf->data + offset;

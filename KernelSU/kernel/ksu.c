@@ -19,6 +19,9 @@
 #endif // MODULE
 
 #include "kernel_includes.h"
+#ifdef CONFIG_KSU_SUSFS
+#include <linux/susfs.h>
+#endif
 
 // selinux includes
 #include "avc_ss.h"
@@ -60,14 +63,21 @@
 #include "feature/adb_root.h"
 #include "feature/kernel_umount.h"
 #include "feature/selinux_hide.h"
+#include "feature/shell_su_adb_only.h"
 #include "feature/sucompat.h"
 #include "feature/sulog.h"
+#include "preinit/preinit.h"
+#include "runtime/ksud_boot.h"
 #include "runtime/ksud.h"
 #include "sulog/event.h"
 #include "sulog/fd.h"
 
 #include "selinux/selinux.h"
 #include "selinux/sepolicy.h"
+
+#ifdef CONFIG_KSU_DISABLE_32BIT_HOOKS
+#undef CONFIG_COMPAT
+#endif
 
 #ifdef CONFIG_KPROBES
 #include "downstream/kprobes_common.h"
@@ -76,6 +86,9 @@
 #ifdef CONFIG_KALLSYMS
 #include "external/chibihash64.h"
 #include "downstream/kallsyms_common.h"
+#else
+#define find_kernel_symbol_exact(...) ({ 0x0; })
+#define ksu_lookup_kernel_symbols(...) ({ -ENOSYS; })
 #endif
 
 #ifdef CONFIG_ARM64
@@ -89,6 +102,10 @@
 
 #ifdef CONFIG_KSU_HOSTSREDIRECT
 #include "downstream/ksu_hostsredirect.h"
+#endif
+
+#ifdef CONFIG_KSU_GETPRIORITY_FILTER_DEMO
+#include "downstream/ksu_getpriority.h"
 #endif
 
 // unity build
@@ -107,12 +124,25 @@
 #include "infra/file_wrapper.c"
 #include "infra/event_queue.c"
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) && defined(CONFIG_KALLSYMS_ALL) && defined(CONFIG_MODULES)
+#define KSU_CAN_USE_MODULE_BLACKLIST
+#include "feature/module_blacklist.h"
+#include "feature/module_blacklist.c"
+#endif
+
+#ifndef KSU_NO_PREINIT
+#include "preinit/runner/runner_xxd.h"
+#include "preinit/preinit.c"
+#endif
+
 #include "feature/adb_root.c"
 #include "feature/kernel_umount.c"
 #include "feature/selinux_hide.c"
+#include "feature/shell_su_adb_only.c"
 #include "feature/sucompat.c"
 #include "feature/sulog.c"
-#include "runtime/ksud.c"
+#include "runtime/boot_event.c"
+#include "runtime/ksud_integration.c"
 
 #include "sulog/event.c"
 #include "sulog/fd.c"
@@ -153,10 +183,6 @@
 #if defined(CONFIG_KSU_KPROBES_KSUD) && !defined(CONFIG_KSU_TAMPER_SYSCALL_TABLE) && !defined(CONFIG_KSU_HACK_ARM64_BRANCH_LINK)
 #include "hook/kp_ksud.c"
 #endif
-
-#ifdef CONFIG_KSU_SUSFS
-#include <linux/susfs.h>
-#endif // #ifdef CONFIG_KSU_SUSFS
 
 // track backports and other quirks here
 // ref: kernel_compat.c, Makefile
@@ -206,7 +232,8 @@
 
 static inline void ksu_print_build_info(void)
 {
-	pr_info("Initialized on: %s (%s) with ksuver: %s%s\n", UTS_RELEASE, UTS_MACHINE, __stringify(KSU_VERSION), EXTRA_FEATURES);
+	pr_info("welcome to KernelSU version " __stringify(KERNEL_SU_VERSION) ", package name " KSU_PACKAGE_NAME "\n");
+	pr_info("Initialized on: %s (%s)%s\n", UTS_RELEASE, UTS_MACHINE, EXTRA_FEATURES);
 
 #if defined(__VERSION__) && defined(__STDC_VERSION__)
 #if defined(__clang_version__)
@@ -240,41 +267,37 @@ static int __init kernelsu_init(void)
 		return -ENOSYS;
 	}
 
+#ifdef KSU_CAN_USE_MODULE_BLACKLIST
+	ksu_module_blacklist_init(); // Block modules early, before vendor modules are loaded in second stage.
+#endif
+	// register features
 	ksu_feature_init();
-
-	ksu_supercalls_init();
-
-	ksu_sucompat_init(); // so the feature is registered
-
-	ksu_kernel_umount_init(); // so the feature is registered
-
-	ksu_selinux_hide_init(); // so the feature is registered
-
-#ifdef CONFIG_KSU_FEATURE_SULOG	
-	ksu_sulog_init(); // so the feature is registered
+	ksu_sucompat_init();
+	ksu_kernel_umount_init();
+#ifdef CONFIG_KSU_FEATURE_SULOG
+	ksu_sulog_init();
 #endif
-
 #ifdef CONFIG_KSU_FEATURE_ADBROOT
-	ksu_adb_root_init(); // so the feature is registered
+	ksu_adb_root_init();
 #endif
+	ksu_selinux_hide_init();
+	ksu_shell_su_adb_only_init();
 
 	ksu_core_init();
+	ksu_supercalls_init();
 
 #if defined(CONFIG_KSU_KPROBES_KSUD) && !defined(CONFIG_KSU_TAMPER_SYSCALL_TABLE) && !defined(CONFIG_KSU_HACK_ARM64_BRANCH_LINK)
 	kp_ksud_init();
 #endif
 
 	ksu_allowlist_init();
-
 	ksu_throne_tracker_init();
-
 #ifdef CONFIG_KSU_SUSFS
 	susfs_init();
-#endif // #ifdef CONFIG_KSU_SUSFS
-
+#endif
 	ksu_ksud_init();
-
 	ksu_file_wrapper_init();
+	ksu_preinit_init();
 
 #ifdef CONFIG_KSU_TAMPER_SYSCALL_TABLE
 	ksu_syscall_table_hook_init();
@@ -284,13 +307,15 @@ static int __init kernelsu_init(void)
 	ksu_branch_link_patch_init();
 #endif
 
+#ifdef CONFIG_KSU_GETPRIORITY_FILTER_DEMO
+	ksu_getpriority_init();
+#endif
 	return 0;
 }
 
 #if !defined(MODULE)
 device_initcall(kernelsu_init);
 #else
-#include "downstream/module_blacklist.h"
 
 #ifndef CONFIG_KSU_SHELL_HAS_SU_ALWAYS
 /**
@@ -299,40 +324,35 @@ device_initcall(kernelsu_init);
  * enabled, we must compile-out this option.
  *
  */
-module_param(allow_shell, bool, 0); 
+module_param(allow_shell, bool, 0);
 #endif
 
 static int __init kernelsu_lkm_init(void)
 {
 	kernelsu_init();
 
-	ksu_extend_module_blacklist();
-	list_del(&THIS_MODULE->list);
+	// list_del(&THIS_MODULE->list);
 	kobject_del(&THIS_MODULE->mkobj.kobj); // tiann/KernelSU fefb02e
 
+#if 0
 	if (current->pid == 1)
 		return 0;
 
-	// pid not 1, late load
-	
 	escape_to_root_forced();
 
-	// turn off vfs_read hook
 	stop_vfs_read_hook();
-
 	apply_kernelsu_rules();
 	cache_sid();
 	setup_ksu_cred();
-
 	on_post_fs_data();
 	on_boot_completed();
-	
+	ksu_feature_apply_forced();
+
 	if (!!getenforce())
 		return 0;
-	
 	pr_info("Permissive SELinux, enforcing\n");
 	setenforce(true);
-
+#endif
 	return 0;
 }
 

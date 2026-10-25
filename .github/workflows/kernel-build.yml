@@ -169,6 +169,6 @@ jobs:
           
           Built from ${GITHUB_REPOSITORY}@${GITHUB_SHA} with AOSP clang ${LLVM_VER} (LLVM_IAS=1, ld.lld).
           
-          **Stack:** KernelSU (backslashxx, v3.3.0+) - SuSFS v2.3.0 - NoMount v2.0.0 - DroidSpaces container support
+          **Stack:** KernelSU (backslashxx, v32704 / UAPI v6) - SuSFS v2.3.0 - NoMount v2.2.0 - DroidSpaces container support
           
           Flash with a custom recovery (or a kernel flasher that supports AnyKernel3)."

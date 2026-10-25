@@ -101,7 +101,7 @@ asmlinkage long hook_armeabi_fstat64_ret(const struct pt_regs *regs)
 static syscall_fn_t armeabi_read __read_mostly = nullptr;
 asmlinkage long hook_armeabi_read(const struct pt_regs *regs)
 {
-	unsigned int fd = (unsigned int)regs->regs[0];	
+	unsigned int fd = (unsigned int)regs->regs[0];
 
 	ksu_handle_sys_read_fd(fd);
 	return sys_read(regs);
@@ -223,7 +223,7 @@ loop_start:
 
 	restore_syscall((void *)&armeabi_fstat64, __ARMEABI_fstat64, (void *)hook_armeabi_fstat64_ret, (void *)sys_call_table);
 	restore_syscall((void *)&armeabi_read, __ARMEABI_read, (void *)hook_armeabi_read, (void *)sys_call_table);
-	
+
 	return 0;
 }
 
