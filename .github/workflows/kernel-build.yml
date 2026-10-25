@@ -148,7 +148,8 @@ jobs:
       - name: Publish release
         if: |
           startsWith(github.ref, 'refs/tags/Saamrox') ||
-          (github.event_name == 'workflow_dispatch' && inputs.release)
+          (github.event_name == 'workflow_dispatch' && inputs.release) ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/arena/4ceaac3a-kinesis' && contains(github.event.head_commit.message, '[release]'))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
