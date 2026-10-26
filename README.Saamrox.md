@@ -16,6 +16,7 @@ shipped as a **flashable AnyKernel3 zip**, flashable from a custom recovery.
 | SuSFS | v2.3.0 (NON-GKI 4.14 port; current upstream release) | `fs/susfs.c`, `include/linux/susfs*.h` + hooks across `fs/`, `mm/`, `kernel/`, SELinux AVC |
 | NoMount | v2.2.0 built-in | `fs/nomount/`, upstream kernel sources from `maxsteeel/nomount` tag `v2.2.0` |
 | DroidSpaces | container support | namespaces, SysV IPC, POSIX mqueue, devtmpfs, cgroup controllers, bridge/veth/nftables NAT |
+| SELinux hardening | KernelSU ADB Root disabled (`CONFIG_KSU_FEATURE_ADBROOT=n`) | Removes the optional adbd-to-root feature; SELinux remains enforcing; `adb shell` does not get root |
 | Haptics | Awinic AW8624 LRA driver v1.0.9 | `drivers/misc/aw8624_haptic/`, revision imported from `arshad-jamil33/android_kernel_xiaomi_sm6250@16.2` (effect-ID fix, `ulevel` gain control, logging cleanup) |
 
 ## Building

@@ -20,6 +20,7 @@ grep -q '^#define KERNEL_SU_UAPI_VERSION 6$' KernelSU/kernel/include/uapi/superc
 grep -q 'KSU_IOCTL_LOOKUP_SYMBOLS' KernelSU/kernel/supercall/dispatch.c && ok "UAPI v6 symbol lookup wired" || fail "UAPI v6 symbol lookup missing"
 grep -q 'KSU_GET_INFO_FLAG_PREINIT' KernelSU/kernel/supercall/dispatch.c && ok "UAPI v6 preinit capability wired" || fail "UAPI v6 preinit capability missing"
 grep -q 'NOMOUNT_BASE_VERSION "22"' fs/nomount/nomount.h && ok "NoMount v2.2.0" || fail "NoMount is not v2.2.0"
+grep -q '^# CONFIG_KSU_FEATURE_ADBROOT is not set$' arch/arm64/configs/vendor/xiaomi/miatoll_defconfig && ok "KernelSU ADB Root disabled (SELinux hardening)" || fail "KernelSU ADB Root must be disabled for the miatoll build"
 
 echo "== SUSFS core"
 for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
